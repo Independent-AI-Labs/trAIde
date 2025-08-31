@@ -88,7 +88,7 @@ function openBrowser(url) {
   try { spawn(cmd, args, { stdio: 'ignore', detached: true }).unref() } catch {}
 }
 
-async function startUI({ prod = false, port = 3333, baseUrl, envKVs = [], open = false } = {}) {
+async function startUI({ prod = false, port = 3333, baseUrl, envKVs = [], open = false, force = true, envFile } = {}) {
   if (!fs.existsSync(APP_DIR)) {
     console.error('Error: apps/traide-ui not found. Run from repo root.')
     process.exit(1)
@@ -104,10 +104,19 @@ async function startUI({ prod = false, port = 3333, baseUrl, envKVs = [], open =
   const errFd = fs.openSync(LOG_FILE, 'a')
 
   const env = { ...process.env }
+  if (envFile) Object.assign(env, loadEnvFile(envFile))
   if (baseUrl) env.NEXT_PUBLIC_MCP_BASE_URL = baseUrl
   for (const kv of envKVs) {
     const idx = kv.indexOf('=')
     if (idx > 0) env[kv.slice(0, idx)] = kv.slice(idx + 1)
+  }
+
+  // Preflight: ensure port is free
+  if (force) {
+    await killPorts([port])
+  } else {
+    const busy = await isPortBusy(port)
+    if (busy) { console.error(`Port ${port} is busy. Use --force to free it.`); process.exit(1) }
   }
 
   const args = []
@@ -135,6 +144,7 @@ async function startUI({ prod = false, port = 3333, baseUrl, envKVs = [], open =
   writePid(child.pid)
   child.unref()
   console.log(`UI started (pid ${child.pid}) on http://localhost:${port}`)
+  writeMeta('ui.port', String(port))
   if (open) openBrowser(`http://localhost:${port}`)
 }
 
@@ -198,7 +208,7 @@ function logsUI({ follow = false, lines = 200 } = {}) {
   }
 }
 
-async function startMCP({ port = 8787, corsOrigin, mini = true } = {}) {
+async function startMCP({ port = 8787, corsOrigin, mini = true, force = true, envFile } = {}) {
   if (!fs.existsSync(MCP_DIR)) {
     console.error('Error: packages/traide-mcp not found. Run from repo root.')
     process.exit(1)
@@ -213,6 +223,7 @@ async function startMCP({ port = 8787, corsOrigin, mini = true } = {}) {
   const errFd = fs.openSync(MCP_LOG, 'a')
 
   const env = { ...process.env }
+  if (envFile) Object.assign(env, loadEnvFile(envFile))
   env.PORT = String(port)
   if (corsOrigin) env.MCP_CORS_ORIGINS = corsOrigin
 
@@ -225,11 +236,19 @@ async function startMCP({ port = 8787, corsOrigin, mini = true } = {}) {
     cmd = npmCmd
     args = ['run', 'dev:http']
   }
+  // Preflight: ensure port is free
+  if (force) {
+    await killPorts([port])
+  } else {
+    const busy = await isPortBusy(port)
+    if (busy) { console.error(`Port ${port} is busy. Use --force to free it.`); process.exit(1) }
+  }
   console.log(`Starting MCP (${mini ? 'mini' : 'dev:http'}) on :${port}...`)
   const child = spawn(cmd, args, { cwd: MCP_DIR, env, detached: true, stdio: ['ignore', outFd, errFd] })
   writeMcpPid(child.pid)
   child.unref()
   console.log(`MCP started (pid ${child.pid}) on http://localhost:${port}`)
+  writeMeta('mcp.port', String(port))
 }
 
 async function stopMCP() {
@@ -276,11 +295,11 @@ function logsMCP({ follow = false, lines = 200 } = {}) {
   }
 }
 
-async function startAll({ uiPort = 65001, mcpPort = 65000, mini = true, open = false, cors } = {}) {
+async function startAll({ uiPort = 65001, mcpPort = 65000, mini = true, open = false, cors, force = true, envFile } = {}) {
   const uiOrigin = `http://localhost:${uiPort}`
   const corsOrigin = cors || '*'
-  await startMCP({ port: mcpPort, corsOrigin, mini })
-  await startUI({ port: uiPort, baseUrl: `http://localhost:${mcpPort}`, open })
+  await startMCP({ port: mcpPort, corsOrigin, mini, force, envFile })
+  await startUI({ port: uiPort, baseUrl: `http://localhost:${mcpPort}`, open, force, envFile })
 }
 
 async function stopAll() {
@@ -297,9 +316,9 @@ async function main() {
   const [domain, subcmd] = argv._
   const help = () => {
     console.log(`Usage:
-  traide-runner ui <start|stop|status|logs> [--prod] [--port 3333] [--open] [--base-url URL] [--env KEY=VALUE]
-  traide-runner mcp <start|stop|status|logs> [--port 8787] [--cors http://localhost:3333] [--mini]
-  traide-runner all <start|stop|status|nuke> [--ui-port 3333] [--mcp-port 8787] [--mini] [--open]
+  traide-runner ui <start|stop|status|logs> [--prod] [--port 3333] [--open] [--base-url URL] [--env KEY=VALUE] [--env-file .env] [--no-force]
+  traide-runner mcp <start|stop|status|logs> [--port 8787] [--cors http://localhost:3333] [--mini] [--env-file .env] [--no-force]
+  traide-runner all <start|stop|status|nuke> [--ui-port 3333] [--mcp-port 8787] [--mini] [--open] [--env-file .env] [--no-force]
 `)
   }
   if (!domain) return help()
@@ -308,9 +327,11 @@ async function main() {
     const baseUrl = argv.flags['base-url'] || process.env.NEXT_PUBLIC_MCP_BASE_URL
     const envKVs = ([]).concat(argv.flags.env || []).flat().filter(Boolean)
     const open = Boolean(argv.flags.open)
+    const force = argv.flags['no-force'] ? false : true
+    const envFile = argv.flags['env-file']
     const prod = Boolean(argv.flags.prod)
     switch (subcmd) {
-      case 'start': return await startUI({ prod, port, baseUrl, envKVs, open })
+      case 'start': return await startUI({ prod, port, baseUrl, envKVs, open, force, envFile })
       case 'stop': return await stopUI()
       case 'status': return statusUI()
       case 'logs': return logsUI({ follow: Boolean(argv.flags.follow), lines: argv.flags.lines ? Number(argv.flags.lines) : 200 })
@@ -319,9 +340,11 @@ async function main() {
   } else if (domain === 'mcp') {
     const port = argv.flags.port ? Number(argv.flags.port) : 8787
     const cors = argv.flags.cors
+    const force = argv.flags['no-force'] ? false : true
+    const envFile = argv.flags['env-file']
     const mini = argv.flags.mini !== undefined ? Boolean(argv.flags.mini) : true
     switch (subcmd) {
-      case 'start': return await startMCP({ port, corsOrigin: cors, mini })
+      case 'start': return await startMCP({ port, corsOrigin: cors, mini, force, envFile })
       case 'stop': return await stopMCP()
       case 'status': return statusMCP()
       case 'logs': return logsMCP({ follow: Boolean(argv.flags.follow), lines: argv.flags.lines ? Number(argv.flags.lines) : 200 })
@@ -331,10 +354,12 @@ async function main() {
     const uiPort = argv.flags['ui-port'] ? Number(argv.flags['ui-port']) : 65001
     const mcpPort = argv.flags['mcp-port'] ? Number(argv.flags['mcp-port']) : 65000
     const mini = argv.flags.mini !== undefined ? Boolean(argv.flags.mini) : true
+    const force = argv.flags['no-force'] ? false : true
+    const envFile = argv.flags['env-file']
     const open = Boolean(argv.flags.open)
     const cors = argv.flags.cors
     switch (subcmd) {
-      case 'start': return await startAll({ uiPort, mcpPort, mini, open, cors })
+      case 'start': return await startAll({ uiPort, mcpPort, mini, open, cors, force, envFile })
       case 'stop': return await stopAll()
       case 'status': return statusAll()
       case 'nuke': {
@@ -382,6 +407,45 @@ async function killPorts(ports = []) {
       await tryKill(pid)
     }
   }
+}
+
+function writeMeta(name, val) {
+  ensureRunDir()
+  try { fs.writeFileSync(path.join(RUN_DIR, name), String(val)) } catch {}
+}
+
+async function isPortBusy(port) {
+  const run = (cmd, args) => new Promise((resolve) => {
+    const p = spawn(cmd, args, { stdio: ['ignore', 'pipe', 'ignore'] })
+    let out = ''
+    p.stdout.on('data', (b) => { out += b.toString('utf8') })
+    p.on('exit', () => resolve(out))
+  })
+  if (process.platform === 'win32') {
+    const out = await run('powershell.exe', ['-NoProfile', `Get-NetTCPConnection -LocalPort ${port} | Measure-Object | Select-Object -ExpandProperty Count`])
+    const n = Number(String(out || '').trim()); return Number.isFinite(n) && n > 0
+  } else {
+    const out = await run('bash', ['-lc', `command -v lsof >/dev/null 2>&1 && lsof -tiTCP:${port} -sTCP:LISTEN | wc -l || echo 0`])
+    const n = Number(String(out || '').trim()); return Number.isFinite(n) && n > 0
+  }
+}
+
+function loadEnvFile(file) {
+  const env = {}
+  try {
+    const s = fs.readFileSync(file, 'utf8')
+    s.split(/\r?\n/).forEach((line) => {
+      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)\s*$/)
+      if (!m) return
+      const key = m[1]
+      let val = m[2]
+      if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+        val = val.slice(1, -1)
+      }
+      env[key] = val
+    })
+  } catch {}
+  return env
 }
 
 main().catch((e) => { console.error(e); process.exit(1) })

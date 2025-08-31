@@ -3,6 +3,7 @@ import { useMcpConfig } from '@/lib/config'
 import { useSSE } from '@/lib/useSSE'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MiniChart } from '../charts/MiniChart'
+import { StatusPill } from '@/components/ui/StatusPill'
 
 type KlineEvent = {
   type: 'kline'
@@ -18,6 +19,7 @@ export function HeroChartLive({ symbol = 'BTCUSDT', interval = '1m' }: { symbol?
   const url = `/api/mcp/stream/klines?symbol=${symbol}&interval=${interval}&indicators=ppo,rsi`
   const { last, connected } = useSSE<KlineEvent>(url, true)
   const [series, setSeries] = useState<{ t: number; c: number }[]>([])
+  const [loading, setLoading] = useState(true)
   const lastTs = useRef<number>(0)
 
   useEffect(() => {
@@ -36,12 +38,34 @@ export function HeroChartLive({ symbol = 'BTCUSDT', interval = '1m' }: { symbol?
     }
   }, [last])
 
-  const status = useMemo(() => (connected ? 'LIVE' : 'RECONNECTING'), [connected])
+  // Seed with recent history so chart isn't empty
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      try {
+        const r = await fetch(`/api/mcp/klines?symbol=${symbol}&interval=${interval}&limit=200`, { cache: 'no-cache' })
+        if (!r.ok) throw new Error('history_fetch_error')
+        const j = await r.json()
+        const candles: { t: number; c: number }[] = (j?.candles || []).map((k: any) => ({ t: k.t, c: k.c }))
+        if (!cancelled) {
+          setSeries(candles)
+          lastTs.current = candles.length ? candles[candles.length - 1]!.t : 0
+        }
+      } catch {
+        // ignore for now
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [symbol, interval])
 
   return (
     <div className="relative">
-      <div className="absolute right-3 top-3 z-10 rounded-full bg-white/10 px-3 py-1 text-xs text-white/80">
-        {symbol} · {interval} · {status}
+      <div className="absolute right-3 top-3 z-10">
+        <StatusPill label={`${symbol} · ${interval}`} connected={connected} />
       </div>
       <MiniChart data={series} className="h-64 w-full rounded-xl" />
     </div>

@@ -17,7 +17,7 @@ export function EndpointControl() {
         <div className="absolute right-0 z-20 w-[380px] rounded-2xl border border-white/10 bg-base-900/95 p-3 shadow-depth backdrop-blur-md">
           <div className="text-xs text-white/80">MCP Base URL</div>
           <input
-            className="mt-2 w-full rounded-lg border border-white/20 bg-base-800/80 px-3 py-2 text-sm text-white placeholder-white/50 outline-none focus:border-white/40"
+            className="mt-2 w-full rounded-lg border border-white/20 bg-base-800/80 px-3 py-2 text-sm text-white placeholder-white/50 outline-none focus:border-white/40 focus:ring-1 focus:ring-white/20"
             placeholder="http://172.72.72.2:65000"
             value={val}
             onChange={(e) => setVal(e.target.value)}
