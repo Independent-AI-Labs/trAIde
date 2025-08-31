@@ -1,10 +1,5 @@
+.run/
 node_modules/
-coverage/
 dist/
-.DS_Store
-.nyc_output/
+.next/
 *.log
-.env
-.env.*
-.vscode/
-*.local

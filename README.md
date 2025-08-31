@@ -1,4 +1,4 @@
-# trAIde — AI‑Ready Technical Analysis Toolkit
+# Traide — Real‑Time Technical Analysis, Built for Builders
 
 ![trAIde banner](trAIde.png)
 
@@ -6,30 +6,32 @@
 ![coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
 ![types](https://img.shields.io/badge/types-TypeScript-blue)
 
-TypeScript-first technical analysis indicators, a faithful port of Python `ta` with modern DX for Node.js and browsers. Pure functions, strict types, tree-shakable, with streaming calculators for real-time apps.
+Traide is a modern TA stack: a TypeScript indicator engine, a streaming MCP server, and a stunning React UI. It’s the fastest way to go from “idea” to “live, shareable chart with real data”.
 
-What is trAIde?
-- 🚀 Enterprise‑grade technical analysis for TypeScript — built for AI workflows, modern web apps, and trading automation.
-- 🧠 Combines a comprehensive indicator engine, real‑time streaming calculators, React UI components (incoming), and an MCP Server (incoming) to power LLM‑driven agents and dashboards.
+Why Traide (in plain English)
+- Show, don’t tell: live charts, real streams, zero yak‑shaving.
+- Ship fast: batteries‑included UI, server, and core indicators.
+- Grow with you: start with a demo, scale to real users and agents.
 
-Why teams choose trAIde
-- 📦 Comprehensive indicators: trend, momentum, volatility, volume — aligned with Python ta
-- ⚡ Real‑time: streaming calculators for low‑latency updates
-- 🧩 React UI (incoming): drop‑in overlays/panes for rapid dashboards
-- 🤖 MCP Server (incoming): Model Context Protocol to expose tools to AI agents
-- ✅ Quality: parity‑tested vs fixtures, ~98% coverage, strict types, tree‑shakable builds
-- 🌐 Browser + Node: zero native deps; fast deque‑based rolling windows
+What you get
+- 📦 Indicators you trust: parity with Python ta, tested end‑to‑end.
+- ⚡ Real‑time streams: server‑side deltas for buttery‑smooth charts.
+- 🖥️ Beautiful UI: glass‑morphic, minimal, production‑ready shell.
+- 🤖 Agent‑ready: MCP server for AI tools and automation.
+- ✅ Quality‑driven: tests, types, coverage, and docs.
 
-Install (Core)
-```bash
-npm install traide
-```
+Try It Locally (2 commands)
+1) Install deps: `npm install`
+2) Start UI + Stream Server: `npm run dev:start`
 
-Links & Technical Docs
-- 📘 Technical Analysis Engine: DOCUMENTATION-TA.md
-- 🧩 React UI Components: DOCUMENTATION-REACT.mc
-- 🤝 MCP Server (Model Context Protocol): DOCUMENTATION-MCP.md
-Core package name is currently `tats` while the repo is trAIde. We’ll publish under the trAIde scope when packaging is finalized.
+Open: `http://localhost:65001`
+
+If your environment uses a different host/IP, click the top‑right “Endpoint” pill and paste your MCP URL (e.g., `http://172.72.72.2:65000`).
+
+What’s Inside (at a glance)
+- Core TA library (TypeScript) with streaming calculators
+- MCP server (REST + SSE) for live Binance data and metrics
+- React app with a live hero chart, minimal workspace, and endpoint control
 
 Quality & Parity
 - 🧪 Tests mirror Python `ta` fixtures; tight tolerances
@@ -43,7 +45,7 @@ Indicator Coverage (selected)
 - Volume: OBV, ADL, CMF, Force Index, Ease of Movement (+SMA), VPT (+smoothed), NVI, MFI, VWAP, Chaikin Oscillator
 - Others: Daily/Log/Cumulative Returns
 
-Architecture at a glance
+Architecture
 
 ```mermaid
 graph LR
@@ -57,7 +59,7 @@ graph LR
   MCP --> AGENTS[AI Agents and LLMs]
 ```
 
-MCP Server interaction
+How the Server Helps
 
 ```mermaid
 sequenceDiagram
@@ -80,40 +82,25 @@ sequenceDiagram
   MCP-->>APP: live signals
 ```
 
-Docs
-- 📘 API reference: docs/API.md
-- 🔬 Engine details: DOCUMENTATION-TA.md
-- 🧩 React library: DOCUMENTATION-REACT.mc
-- 🤝 MCP server: DOCUMENTATION-MCP.md
+Docs & Links
+- Core TA engine: DOCUMENTATION-TA.md
+- React UI plan/spec: SPEC-UI.md, SPEC-REACT-COMP.md
+- MCP server: DOCUMENTATION-MCP.md
 
-Quickstart: MCP Server
-- Install deps and build:
-  - `npm install`
-  - `npm run build` (root) and `npm run build` in `packages/traide-mcp`
-- Run MCP + HTTP locally:
-  - `PORT=8080 MCP_ENABLE_HTTP=true node packages/traide-mcp/dist/index.js`
-- Try endpoints:
-  - `curl http://localhost:8080/health`
-  - `curl http://localhost:8080/symbols`
-  - `curl 'http://localhost:8080/klines?symbol=BTCUSDT&interval=1m&limit=50'`
-  - `curl -N 'http://localhost:8080/stream/klines?symbol=BTCUSDT&interval=1m&indicators=macd,rsi'`
-  - Add PPO/PVO: `indicators=macd,rsi,ppo,pvo` for streaming deltas
-  - CORS allowlist: set `MCP_CORS_ORIGINS` (comma‑separated or `*`)
-  - `curl http://localhost:8080/metrics` (Prometheus format)
+Production‑Ready Next Steps
+- One‑click deploy (UI on Vercel; MCP on your infra)
+- Google/X auth, saved layouts, watchlists, and scanners
+- More streaming signals and presets out of the box
 
-Roadmap (Near‑Term)
-- ✅ Finalize parity sweep and defaults vs Python `ta`
-- 🧩 React UI component library (overlays/panes, hooks)
-- 🤝 MCP Server to integrate indicators with AI agents
-- 📊 Demo app: historical + live Binance (REST + WebSocket)
-- 📚 Typedoc site, examples, strategy cookbook
+Roadmap
+- 📈 More signals and strategy presets
+- 🔐 Auth + personal workspaces (Google/X)
+- 🧪 Playgrounds, scanners, and shareable links
+- 📦 Docker images and deploy guides
 
 Contributing
-- Run lint, typecheck, tests:
-  ```bash
-  npm run lint && npm run typecheck && npm test
-  ```
-- PRs welcome for additional fixtures, indicators, and docs.
+- `npm run lint && npm run typecheck && npm test`
+- PRs welcome for indicators, docs, and UI polish.
 
 License
 - MIT
