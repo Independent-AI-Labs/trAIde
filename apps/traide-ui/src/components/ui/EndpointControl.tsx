@@ -10,7 +10,7 @@ export function EndpointControl() {
   return (
     <div className="relative">
       {!open ? (
-        <button className="rounded-xl bg-white/10 px-3 py-1.5 text-xs text-white/80 hover:bg-white/15" onClick={() => setOpen(true)}>
+        <button aria-label="Edit MCP endpoint" className="rounded-xl bg-white/10 px-3 py-1.5 text-xs text-white/80 hover:bg-white/15" onClick={() => setOpen(true)}>
           Endpoint: {truncate(baseUrl, 32)}
         </button>
       ) : (

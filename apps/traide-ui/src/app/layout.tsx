@@ -1,6 +1,7 @@
 import './globals.css'
 import type { ReactNode } from 'react'
 import { MCPConfigProvider } from '@/lib/config'
+import { NetConfigProvider } from '@/lib/net/config'
 import { MarketCacheProvider } from '@/lib/data/market-cache'
 import { ToastProvider } from '@/components/ui/Toast'
 import { EndpointControl } from '@/components/ui/EndpointControl'
@@ -15,6 +16,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className="dark">
       <body className="min-h-screen antialiased">
         <MCPConfigProvider>
+          <NetConfigProvider>
           <MarketCacheProvider>
             <ToastProvider>
               <main className="relative min-h-screen">
@@ -24,6 +26,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
               </main>
             </ToastProvider>
           </MarketCacheProvider>
+                  </NetConfigProvider>
         </MCPConfigProvider>
       </body>
     </html>

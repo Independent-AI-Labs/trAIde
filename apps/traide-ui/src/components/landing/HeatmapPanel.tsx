@@ -4,11 +4,13 @@ import { getGroup } from '@/lib/symbols'
 import { IntervalSelect } from '@/components/ui/IntervalSelect'
 import { useFetchers } from '@/lib/data/fetchers'
 import { usePref } from '@/lib/prefs'
+import { useIdlePrefetch } from '@/lib/data/prefetch'
 
 export function HeatmapPanel() {
   const [groupId, setGroupId] = usePref<string>('heatmap.group', 'majors')
   const [interval, setInterval] = usePref<'1m' | '5m' | '15m' | '1h' | '4h' | '1d'>('heatmap.interval', '1m')
   const group = getGroup(groupId)
+  useIdlePrefetch(group.symbols, interval, 60)
   const [rows, setRows] = useState<{ symbol: string; changePct: number }[]>([])
   const { fetchKlinesCached } = useFetchers()
 

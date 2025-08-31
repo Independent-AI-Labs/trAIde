@@ -6,6 +6,7 @@ import { getGroup } from '@/lib/symbols'
 import { useFetchers } from '@/lib/data/fetchers'
 import { usePref } from '@/lib/prefs'
 import { DataTable, Column } from '@/components/ui/DataTable'
+import { useIdlePrefetch } from '@/lib/data/prefetch'
 
 type Candle = { t: number; o: number; h: number; l: number; c: number; v: number }
 
@@ -28,6 +29,7 @@ export function ScannerPanel() {
   const { fetchKlinesCached } = useFetchers()
 
   const group = getGroup(groupId)
+  useIdlePrefetch(group.symbols, interval, lookback)
 
   useEffect(() => {
     let cancelled = false

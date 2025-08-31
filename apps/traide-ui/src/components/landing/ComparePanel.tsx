@@ -5,6 +5,7 @@ const MultiLineChart = dynamic(() => import('@/components/charts/MultiLineChart'
 import { IntervalSelect } from '@/components/ui/IntervalSelect'
 import { useFetchers } from '@/lib/data/fetchers'
 import { usePref } from '@/lib/prefs'
+import { useIdlePrefetch } from '@/lib/data/prefetch'
 
 const COLORS = ['#34d399', '#60a5fa', '#f472b6', '#fbbf24']
 
@@ -13,6 +14,7 @@ export function ComparePanel() {
   const [interval, setInterval] = usePref<'1m' | '5m' | '15m' | '1h' | '4h' | '1d'>('compare.interval', '1m')
   const [data, setData] = useState<Record<string, { t: number; c: number }[]>>({})
   const { fetchKlinesCached } = useFetchers()
+  useIdlePrefetch(symbols, interval, 240)
 
   useEffect(() => {
     let cancelled = false

@@ -40,8 +40,8 @@ export function ChartWorkspace({ symbol: initialSymbol }: { symbol: string }) {
           <TimeframeSwitch value={tf} onChange={setTf} />
         </div>
         <div className="flex items-center gap-3">
-          <GlassButton className="bg-white/5" onClick={() => setOvEMA((v) => !v)}>{ovEMA ? 'EMA20 ✓' : 'EMA20'}</GlassButton>
-          <GlassButton className="bg-white/5" onClick={() => setOvSMA((v) => !v)}>{ovSMA ? 'SMA50 ✓' : 'SMA50'}</GlassButton>
+          <GlassButton className="bg-white/5" aria-pressed={ovEMA} aria-label="Toggle EMA20 overlay" onClick={() => setOvEMA((v) => !v)}>{ovEMA ? 'EMA20 ✓' : 'EMA20'}</GlassButton>
+          <GlassButton className="bg-white/5" aria-pressed={ovSMA} aria-label="Toggle SMA50 overlay" onClick={() => setOvSMA((v) => !v)}>{ovSMA ? 'SMA50 ✓' : 'SMA50'}</GlassButton>
         </div>
       </div>
 
