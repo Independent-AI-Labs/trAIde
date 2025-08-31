@@ -1,6 +1,6 @@
-# TATS — Technical Analysis for TypeScript
+# trAIder — AI‑Ready Technical Analysis Toolkit
 
-![trAIde banner](trAIde.png)
+![trAIder banner](trAIde.png)
 
 ![CI](https://github.com/Independent-AI-Labs/trAIde/actions/workflows/ci.yml/badge.svg)
 ![coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
@@ -8,20 +8,27 @@
 
 TypeScript-first technical analysis indicators, a faithful port of Python `ta` with modern DX for Node.js and browsers. Pure functions, strict types, tree-shakable, with streaming calculators for real-time apps.
 
-Highlights
-- Pure, array-in/array-out APIs with `NaN` warmups, matching Python `ta` semantics
-- ESM + CJS + types, zero runtime deps, tree-shakable
-- Parity-verified against Python `ta` CSV fixtures (98%+ coverage)
-- Streaming calculators for EMA/RSI/MACD/ATR/Stochastic/VWAP
-- Ichimoku display helpers (forward spans, chikou) and Bollinger cross indicators
+What is trAIder?
+- An enterprise‑grade, TypeScript technical analysis toolkit built for AI workflows, modern web apps, and trading automation.
+- Combines a comprehensive indicator engine, real‑time streaming calculators, React UI components (up next), and an MCP Server (up next) to plug indicators into LLM‑powered agents.
 
-Install
+Business‑Ready Features
+- Complete indicator coverage: trend, momentum, volatility, and volume signals with Python ta parity
+- React UI components (incoming): chart overlays/panes (BB, Ichimoku, PSAR, RSI, MACD, PPO/PVO, MFI/CMF) for fast dashboards
+- MCP Server (incoming): Model Context Protocol tools to expose indicators and data feeds to AI agents
+- Real‑time: streaming calculators for low‑latency updates (EMA/RSI/MACD/ATR/Stochastic/VWAP)
+- Proven parity + quality: fixture‑tested, ~98% coverage, strict types, tree‑shakable ESM/CJS builds
+- Designed for the browser and Node: zero native deps, robust performance with deque‑based rolling windows
+
+Install (Core)
 ```bash
 npm install tats
 ```
 
-Quickstart
+Quickstart (Core Engine)
 ```ts
+// Core package name is currently `tats` while the repo is trAIde.
+// We’ll publish under the trAIder scope when packaging is finalized.
 import { trend, momentum, volatility, volume, returns, calculators } from 'tats';
 
 const close = [/* numbers */];
@@ -58,10 +65,10 @@ const ema = new calculators.EmaCalc(12);
 const emaSeq = close.map(c => ema.update(c));
 ```
 
-Coverage & Parity
-- Tests mirror Python `ta` fixtures where available; tolerances are tight.
-- Coverage: ~98% statements/lines, 100% functions, branches ~89%.
-- See docs/API.md for the full surface and examples.
+Quality & Parity
+- Tests mirror Python `ta` fixtures where available; tolerances are tight
+- Coverage: ~98% statements/lines, 100% functions, branches ~89%
+- See docs/API.md for the full surface and examples
 
 Indicator Coverage (selected)
 - Trend: SMA, EMA, MACD (+signal/diff), TRIX, Mass Index, Ichimoku (+display helpers), STC, DPO, KST, Aroon, Vortex, PSAR
@@ -70,19 +77,30 @@ Indicator Coverage (selected)
 - Volume: OBV, ADL, CMF, Force Index, Ease of Movement (+SMA), VPT (+smoothed), NVI, MFI, VWAP, Chaikin Oscillator
 - Others: Daily/Log/Cumulative Returns
 
-Design Notes
-- Pure functions; no hidden state. Warmup regions return `NaN` to maintain alignment.
-- EMA/EWM semantics match pandas (adjust=false) where applicable.
-- Fast rolling min/max via deque-based `highest/lowest` utilities.
+Architecture Notes
+- Core engine: pure, deterministic functions; warmup regions return `NaN` for alignment
+- EWM/EMA semantics match pandas (adjust=false) to align with Python ta
+- Performance: O(n) rolling min/max (deques), streaming calculators to avoid array churn
+
+React UI Components (incoming)
+- Headless hooks and presentational components for overlays/panes
+- Built‑ins: BBands, Ichimoku Cloud (display helpers included), PSAR, RSI, MACD/PPO/PVO, ADX, MFI/CMF, OBV, VWAP
+- Works with popular charting libs (e.g., lightweight‑charts) or custom canvas/SVG
+
+MCP Server (incoming)
+- Model Context Protocol server to expose trAIder indicators and market data as agent tools
+- Example tools: compute indicators over historical klines, stream live updates, evaluate signals
+- Enables LLM agents to reason over real‑time markets with structured, typed data
 
 Docs
 - API Reference: see docs/API.md
 
-Roadmap
-- Parity sweep to lock signatures/defaults vs Python `ta`
-- Streaming calculators for additional indicators as needed
-- Typedoc site with examples and cookbook
-- Interactive React demo (historical + live Binance data)
+Roadmap (Near‑Term)
+- Finalize parity sweep and defaults vs Python `ta`
+- React UI component library for overlays/panes (hooks + components)
+- MCP Server to integrate indicators into AI agents
+- Demo app: historical + live Binance data (REST + WebSocket)
+- Typedoc site, examples, and strategy cookbook
 
 Contributing
 - Run lint, typecheck, tests:
