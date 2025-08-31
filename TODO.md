@@ -92,6 +92,20 @@ This is a living checklist to complete feature parity with the Python `ta` libra
 5) Wire WS streaming (Milestone 6); measure perf and optimize
 6) CI: lint, typecheck, test, build + demo deploy
 
+
+## MCP Server Roadmap (Next Items)
+- Dockerize MCP: add `packages/traide-mcp/Dockerfile` and optional `docker-compose.yml`; publish GHCR image in CI.
+- Tighten MCP JSON Schemas: full schemas for `compute_indicators` (required fields, numeric bounds) and `stream_klines`; add explicit schemas for `list_symbols` and `health`.
+- Docs/README: expand deploy instructions (Docker/compose), document CORS/auth envs, CI badges, and a brief OPERATIONS guide.
+- Provider hardening: REST retry/backoff, time-window pagination, proxy support; add unit tests with mocked fetch/ws.
+- Observability: adopt prom-client for metrics, pino logs with request IDs; optional tracing hooks.
+- Workspace polish: consider moving core to `packages/traide-core` and depend from MCP via workspace instead of relative paths.
+- CI release: npm publish for `traide` and GHCR image publish for MCP; changelog/tagging automation.
+- Streaming coverage: add more streaming deltas (e.g., STC, Bollinger band signals) as needed.
+- Tests: unskip SSE integration test once stabilized in CI; add WS reconnection unit tests with fakes.
+- Security: bearer auth for SSE; tune rate limiting; document `MCP_CORS_ORIGINS` behavior.
+
+
 ## Parity Tasks (Double/Triple‑Check Against Python Source)
 - [ ] Review `ta/utils.py` `IndicatorMixin` behavior for `fillna`, and replicate via options: `fillna?: boolean | number` with matching semantics.
 - [ ] Confirm seeding/initialization:
