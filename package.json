@@ -2,6 +2,14 @@
   "name": "tats",
   "version": "0.1.0",
   "description": "Technical Analysis for TypeScript (port of Python ta)",
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/Independent-AI-Labs/traAIder.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Independent-AI-Labs/traAIder/issues"
+  },
+  "homepage": "https://github.com/Independent-AI-Labs/traAIder#readme",
   "type": "module",
   "main": "dist/index.cjs",
   "module": "dist/index.js",

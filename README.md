@@ -1,5 +1,9 @@
 # TATS — Technical Analysis for TypeScript
 
+![CI](https://github.com/Independent-AI-Labs/traAIder/actions/workflows/ci.yml/badge.svg)
+![coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
+![types](https://img.shields.io/badge/types-TypeScript-blue)
+
 TypeScript-first technical analysis indicators, a faithful port of Python `ta` with modern DX for Node.js and browsers. Pure functions, strict types, tree-shakable, with streaming calculators for real-time apps.
 
 Highlights
