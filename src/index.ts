@@ -4,5 +4,6 @@ export * as volatility from "./indicators/volatility";
 export * as volume from "./indicators/volume";
 export * as psar from "./indicators/psar";
 export * as returns from "./indicators/returns";
+export * as calculators from "./calculators";
 
 export type { Series } from "./utils";
