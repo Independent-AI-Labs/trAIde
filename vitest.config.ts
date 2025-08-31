@@ -2,6 +2,8 @@ import { defineConfig } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    server: { deps: { external: ['ws'] } },
+    deps: { optimizer: { ssr: { exclude: ['ws'] } } },
     globals: false,
     coverage: {
       provider: 'v8',

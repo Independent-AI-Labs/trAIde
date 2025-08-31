@@ -1,0 +1,25 @@
+{
+  "name": "@traide/mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "trAIde MCP server exposing indicators and market data",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --transpile-only src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.1.0",
+    "ulid": "^2.3.0",
+    "ws": "^8.17.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.12",
+    "typescript": "^5.5.0"
+  }
+}

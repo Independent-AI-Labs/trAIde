@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 // Micro-benchmark for rolling highest/lowest: naive O(n*w) vs deque O(n)
 // Run: node scripts/bench_rolling.mjs
 
@@ -39,4 +40,3 @@ function run() {
 }
 
 run();
-

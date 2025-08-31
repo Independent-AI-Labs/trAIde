@@ -86,6 +86,21 @@ Docs
 - 🧩 React library: DOCUMENTATION-REACT.mc
 - 🤝 MCP server: DOCUMENTATION-MCP.md
 
+Quickstart: MCP Server
+- Install deps and build:
+  - `npm install`
+  - `npm run build` (root) and `npm run build` in `packages/traide-mcp`
+- Run MCP + HTTP locally:
+  - `PORT=8080 MCP_ENABLE_HTTP=true node packages/traide-mcp/dist/index.js`
+- Try endpoints:
+  - `curl http://localhost:8080/health`
+  - `curl http://localhost:8080/symbols`
+  - `curl 'http://localhost:8080/klines?symbol=BTCUSDT&interval=1m&limit=50'`
+  - `curl -N 'http://localhost:8080/stream/klines?symbol=BTCUSDT&interval=1m&indicators=macd,rsi'`
+  - Add PPO/PVO: `indicators=macd,rsi,ppo,pvo` for streaming deltas
+  - CORS allowlist: set `MCP_CORS_ORIGINS` (comma‑separated or `*`)
+  - `curl http://localhost:8080/metrics` (Prometheus format)
+
 Roadmap (Near‑Term)
 - ✅ Finalize parity sweep and defaults vs Python `ta`
 - 🧩 React UI component library (overlays/panes, hooks)

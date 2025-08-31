@@ -1,5 +1,3 @@
-// Streaming/incremental calculators matching batch functions' seeding/minPeriods
-import { ema as batchEma } from './utils';
 
 export class EmaCalc {
   private readonly alpha: number;
@@ -42,12 +40,10 @@ export class EmaFromCalc {
 }
 
 export class RsiCalc {
-  private readonly w: number;
   private readonly emaGain: EmaCalc;
   private readonly emaLoss: EmaCalc;
   private prev: number | undefined;
   constructor(window = 14) {
-    this.w = window;
     // rsi uses ewmAlpha with alpha=1/window, minPeriods=window
     const alpha = 1 / window;
     this.emaGain = new EmaCalc(2 / alpha - 1, window); // convert alpha to window equiv
@@ -181,3 +177,43 @@ export function emaSeries(values: number[], window: number): number[] {
   return values.map(v => calc.update(v));
 }
 
+
+export class PpoCalc {
+  private readonly fast: EmaCalc;
+  private readonly slow: EmaCalc;
+  private readonly sig: EmaFromCalc;
+  constructor(windowFast = 12, windowSlow = 26, windowSign = 9) {
+    this.fast = new EmaCalc(windowFast, 1);
+    this.slow = new EmaCalc(windowSlow, 1);
+    this.sig = new EmaFromCalc(windowSign);
+  }
+  update(price: number): { ppo: number; signal: number; hist: number } {
+    const ef = this.fast.update(price);
+    const es = this.slow.update(price);
+    const line = !Number.isNaN(ef) && !Number.isNaN(es) && es !== 0 ? ((ef - es) / es) * 100 : NaN;
+    const canStart = !Number.isNaN(line);
+    const signal = this.sig.updateMaybeStart(canStart ? (line as number) : 0, canStart);
+    const hist = !Number.isNaN(line) && !Number.isNaN(signal) ? (line as number) - signal : NaN;
+    return { ppo: line, signal, hist };
+  }
+}
+
+export class PvoCalc {
+  private readonly fast: EmaCalc;
+  private readonly slow: EmaCalc;
+  private readonly sig: EmaFromCalc;
+  constructor(windowFast = 12, windowSlow = 26, windowSign = 9) {
+    this.fast = new EmaCalc(windowFast, 1);
+    this.slow = new EmaCalc(windowSlow, 1);
+    this.sig = new EmaFromCalc(windowSign);
+  }
+  update(volume: number): { pvo: number; signal: number; hist: number } {
+    const ef = this.fast.update(volume);
+    const es = this.slow.update(volume);
+    const line = !Number.isNaN(ef) && !Number.isNaN(es) && es !== 0 ? ((ef - es) / es) * 100 : NaN;
+    const canStart = !Number.isNaN(line);
+    const signal = this.sig.updateMaybeStart(canStart ? (line as number) : 0, canStart);
+    const hist = !Number.isNaN(line) && !Number.isNaN(signal) ? (line as number) - signal : NaN;
+    return { pvo: line, signal, hist };
+  }
+}

@@ -268,7 +268,7 @@ export function ichimokuDisplay(
   window3 = 52,
   displacement = 26,
 ): { tenkan: number[]; kijun: number[]; spanA_fwd: number[]; spanB_fwd: number[]; chikou: number[] } {
-  const { tenkan, kijun, spanA, spanB, spanA_fwd, spanB_fwd } = ichimokuShifted(high, low, window1, window2, window3, displacement);
+  const { tenkan, kijun, spanA_fwd, spanB_fwd } = ichimokuShifted(high, low, window1, window2, window3, displacement);
   const n = Math.min(high.length, low.length, close.length);
   const chikou = new Array(n).fill(NaN);
   // chikou(t) is close(t) plotted at t - displacement

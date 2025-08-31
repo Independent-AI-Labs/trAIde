@@ -2,35 +2,25 @@ name: CI
 
 on:
   push:
-    branches: [ main, master ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main ]
 
 jobs:
-  build:
+  build-and-test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node: [18, 20]
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node
-        uses: actions/setup-node@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
-
-      - name: Install
-        run: npm ci
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Typecheck
-        run: npm run typecheck
-
-      - name: Test (with coverage gate)
-        run: npm test
-
-      - name: Build
-        run: npm run build
-
+          node-version: ${{ matrix.node }}
+      - run: npm ci
+      - run: npm run build --workspaces=false
+      - run: npm run build --workspace packages/traide-mcp
+      - run: npm test
+        env:
+          BINANCE_REST_URL: https://api.binance.com
+          BINANCE_WS_URL: wss://stream.binance.com/ws

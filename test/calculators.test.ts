@@ -74,3 +74,67 @@ describe('Streaming calculators parity', () => {
     for (let i = 0; i < high.length; i++) if (!Number.isNaN(exp[i])) expect(got[i]).toBeCloseTo(exp[i], 12);
   });
 });
+
+  it('PpoCalc approximates batch PPO/Signal/Hist', () => {
+    const closes = Array.from({ length: 200 }, (_, i) => 100 + Math.sin(i / 10) * 5 + i * 0.1);
+    const ppo = new calculators.PpoCalc();
+    const line: number[] = [];
+    const sig: number[] = [];
+    const hist: number[] = [];
+    for (const c of closes) { const r = ppo.update(c); line.push(r.ppo); sig.push(r.signal); hist.push(r.hist); }
+    const bppo = momentum.ppo(closes, 12, 26);
+    const bsig = momentum.ppoSignal(closes, 12, 26, 9);
+    const bhist = momentum.ppoHist(closes, 12, 26, 9);
+    for (let i = 30; i < closes.length; i++) {
+      if (!Number.isNaN(bppo[i])) expect(Math.abs(line[i] - bppo[i])).toBeLessThan(1e-6);
+      if (!Number.isNaN(bsig[i])) expect(Math.abs(sig[i] - bsig[i])).toBeLessThan(1e-6);
+      if (!Number.isNaN(bhist[i])) expect(Math.abs(hist[i] - bhist[i])).toBeLessThan(1e-6);
+    }
+  });
+
+  it('PvoCalc approximates batch PVO/Signal/Hist', () => {
+    const vols = Array.from({ length: 200 }, (_, i) => 1000 + Math.sin(i / 7) * 100 + (i % 13));
+    const pvo = new calculators.PvoCalc();
+    const line: number[] = [];
+    const sig: number[] = [];
+    const hist: number[] = [];
+    for (const v of vols) { const r = pvo.update(v); line.push(r.pvo); sig.push(r.signal); hist.push(r.hist); }
+    const bpvo = momentum.pvo(vols, 12, 26);
+    const bsig = momentum.pvoSignal(vols, 12, 26, 9);
+    const bhist = momentum.pvoHist(vols, 12, 26, 9);
+    for (let i = 30; i < vols.length; i++) {
+      if (!Number.isNaN(bpvo[i])) expect(Math.abs(line[i] - bpvo[i])).toBeLessThan(1e-6);
+      if (!Number.isNaN(bsig[i])) expect(Math.abs(sig[i] - bsig[i])).toBeLessThan(1e-6);
+      if (!Number.isNaN(bhist[i])) expect(Math.abs(hist[i] - bhist[i])).toBeLessThan(1e-6);
+    }
+  });
+
+  it('PPO streaming matches batch', () => {
+    const closes = Array.from({ length: 120 }, (_, i) => 100 + Math.sin(i / 10) * 3 + i * 0.05);
+    const ppo = new calculators.PpoCalc();
+    const line: number[] = [], sig: number[] = [], hist: number[] = [];
+    for (const c of closes) { const r = ppo.update(c); line.push(r.ppo); sig.push(r.signal); hist.push(r.hist); }
+    const bl = momentum.ppo(closes, 12, 26);
+    const bs = momentum.ppoSignal(closes, 12, 26, 9);
+    const bh = momentum.ppoHist(closes, 12, 26, 9);
+    for (let i = 30; i < closes.length; i++) {
+      if (!Number.isNaN(bl[i])) expect(line[i]).toBeCloseTo(bl[i], 8);
+      if (!Number.isNaN(bs[i])) expect(sig[i]).toBeCloseTo(bs[i], 8);
+      if (!Number.isNaN(bh[i])) expect(hist[i]).toBeCloseTo(bh[i], 8);
+    }
+  });
+
+  it('PVO streaming matches batch', () => {
+    const vols = Array.from({ length: 120 }, (_, i) => 1000 + Math.sin(i / 8) * 120 + (i % 11));
+    const pvo = new calculators.PvoCalc();
+    const line: number[] = [], sig: number[] = [], hist: number[] = [];
+    for (const v of vols) { const r = pvo.update(v); line.push(r.pvo); sig.push(r.signal); hist.push(r.hist); }
+    const bl = momentum.pvo(vols, 12, 26);
+    const bs = momentum.pvoSignal(vols, 12, 26, 9);
+    const bh = momentum.pvoHist(vols, 12, 26, 9);
+    for (let i = 30; i < vols.length; i++) {
+      if (!Number.isNaN(bl[i])) expect(line[i]).toBeCloseTo(bl[i], 8);
+      if (!Number.isNaN(bs[i])) expect(sig[i]).toBeCloseTo(bs[i], 8);
+      if (!Number.isNaN(bh[i])) expect(hist[i]).toBeCloseTo(bh[i], 8);
+    }
+  });
