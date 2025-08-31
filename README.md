@@ -46,64 +46,38 @@ Indicator Coverage (selected)
 Architecture at a glance
 
 ```mermaid
-flowchart LR
-  subgraph Data [Data Sources]
-    B1[Binance REST]:::api
-    B2[Binance WS]:::api
-    O[Other Feeds]:::api
-  end
-
-  subgraph Engine [trAIde Core Engine]
-    I[Indicators]:::core
-    S[Streaming Calculators]:::core
-  end
-
-  subgraph UI [React UI (incoming)]
-    C[Chart Components]:::ui
-    H[Headless Hooks]:::ui
-  end
-
-  subgraph MCP [MCP Server (incoming)]
-    T1[compute_indicators]:::mcp
-    T2[stream_klines]:::mcp
-  end
-
-  Data --> Engine
-  Engine --> UI
-  Data --> MCP
-  MCP --> Agents[AI Agents / LLMs]:::ai
-  UI --> Dashboards[Dashboards & Apps]:::app
-  Engine --> Apps[Node/Browser Apps]:::app
-
-  classDef core fill:#0a84ff22,stroke:#0a84ff,color:#0a84ff
-  classDef ui fill:#8e8e9322,stroke:#8e8e93,color:#8e8e93
-  classDef mcp fill:#34c75922,stroke:#34c759,color:#34c759
-  classDef api fill:#ff9f0a22,stroke:#ff9f0a,color:#ff9f0a
-  classDef ai fill:#bf5af222,stroke:#bf5af2,color:#bf5af2
-  classDef app fill:#ffd60a22,stroke:#ffd60a,color:#9a6e00
+graph LR
+  B1[Binance REST] --> E((Core Engine))
+  B2[Binance WS] --> E
+  O[Other Feeds] --> E
+  E --> UI[React UI (incoming)]
+  E --> APPS[Dashboards & Apps]
+  B1 -. also feeds .-> MCP[MCP Server (incoming)]
+  B2 -. also feeds .-> MCP
+  MCP --> AGENTS[AI Agents / LLMs]
 ```
 
 MCP Server interaction
 
 ```mermaid
 sequenceDiagram
-  participant App as App/Agent
+  participant APP as App/Agent
   participant MCP as trAIde MCP
-  participant Data as Data Source
-  participant Core as Indicator Engine
+  participant DATA as Data Source
+  participant CORE as Indicator Engine
 
-  App->>MCP: compute_indicators(symbol, interval, windows)
-  MCP->>Data: fetch klines
-  Data-->>MCP: candles
-  MCP->>Core: run indicators
-  Core-->>MCP: results
-  MCP-->>App: structured signals/series
+  APP->>MCP: compute_indicators(symbol, interval, windows)
+  MCP->>DATA: fetch klines
+  DATA-->>MCP: candles
+  MCP->>CORE: run indicators
+  CORE-->>MCP: results
+  MCP-->>APP: structured signals/series
 
-  App->>MCP: stream_klines(symbol@interval)
-  MCP->>Data: subscribe WS
-  Data-->>MCP: live updates
-  MCP->>Core: incremental compute
-  MCP-->>App: live signals
+  APP->>MCP: stream_klines(symbol@interval)
+  MCP->>DATA: subscribe WS
+  DATA-->>MCP: live updates
+  MCP->>CORE: incremental compute
+  MCP-->>APP: live signals
 ```
 
 Docs
