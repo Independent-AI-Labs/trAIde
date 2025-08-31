@@ -29,42 +29,7 @@ Links & Technical Docs
 - 📘 Technical Analysis Engine: DOCUMENTATION-TA.md
 - 🧩 React UI Components: DOCUMENTATION-REACT.mc
 - 🤝 MCP Server (Model Context Protocol): DOCUMENTATION-MCP.md
-```ts
 Core package name is currently `tats` while the repo is trAIde. We’ll publish under the trAIde scope when packaging is finalized.
-
-const close = [/* numbers */];
-const high = [/* numbers */];
-const low  = [/* numbers */];
-const vol  = [/* numbers */];
-
-// Trend
-const macd   = trend.macd(close, 26, 12);
-const signal = trend.macdSignal(close, 26, 12, 9);
-const diff   = trend.macdDiff(close, 26, 12, 9);
-
-// Momentum
-const rsi14 = momentum.rsi(close, 14);
-const stoch = momentum.stochastic(high, low, close, 14, 3);
-const kRSI  = momentum.stochRsiK(close, 14, 3);
-const dRSI  = momentum.stochRsiD(close, 14, 3, 3);
-
-// Volatility
-const { m: kcM, h: kcH, l: kcL } = volatility.keltnerChannel(high, low, close, 20, 10);
-const ui14 = volatility.ulcerIndex(close, 14);
-const bbUp = volatility.bollingerHbandIndicator(close, 20, 2); // 1 when > upper band
-
-// Volume
-const obv  = volume.onBalanceVolume(close, vol);
-const cmf  = volume.chaikinMoneyFlow(high, low, close, vol, 20);
-const cho  = volume.chaikinOscillator(high, low, close, vol, 3, 10);
-
-// Returns
-const ret  = returns.dailyReturn(close);
-
-// Streaming (EMA example)
-const ema = new calculators.EmaCalc(12);
-const emaSeq = close.map(c => ema.update(c));
-```
 
 Quality & Parity
 - 🧪 Tests mirror Python `ta` fixtures; tight tolerances
@@ -82,23 +47,23 @@ Architecture at a glance
 
 ```mermaid
 flowchart LR
-  subgraph Data[Data Sources]
+  subgraph Data [Data Sources]
     B1[Binance REST]:::api
     B2[Binance WS]:::api
     O[Other Feeds]:::api
   end
 
-  subgraph Engine[trAIde Core Engine]
+  subgraph Engine [trAIde Core Engine]
     I[Indicators]:::core
     S[Streaming Calculators]:::core
   end
 
-  subgraph UI[React UI (incoming)]
+  subgraph UI [React UI (incoming)]
     C[Chart Components]:::ui
     H[Headless Hooks]:::ui
   end
 
-  subgraph MCP[MCP Server (incoming)]
+  subgraph MCP [MCP Server (incoming)]
     T1[compute_indicators]:::mcp
     T2[stream_klines]:::mcp
   end
@@ -163,3 +128,7 @@ Contributing
 
 License
 - MIT
+
+Stargazers over time
+
+[![Star History Chart](https://api.star-history.com/svg?repos=Independent-AI-Labs/trAIde&type=Date)](https://star-history.com/#Independent-AI-Labs/trAIde&Date)
