@@ -9,27 +9,28 @@
 TypeScript-first technical analysis indicators, a faithful port of Python `ta` with modern DX for Node.js and browsers. Pure functions, strict types, tree-shakable, with streaming calculators for real-time apps.
 
 What is trAIder?
-- An enterprise‑grade, TypeScript technical analysis toolkit built for AI workflows, modern web apps, and trading automation.
-- Combines a comprehensive indicator engine, real‑time streaming calculators, React UI components (up next), and an MCP Server (up next) to plug indicators into LLM‑powered agents.
+- 🚀 Enterprise‑grade technical analysis for TypeScript — built for AI workflows, modern web apps, and trading automation.
+- 🧠 Combines a comprehensive indicator engine, real‑time streaming calculators, React UI components (incoming), and an MCP Server (incoming) to power LLM‑driven agents and dashboards.
 
-Business‑Ready Features
-- Complete indicator coverage: trend, momentum, volatility, and volume signals with Python ta parity
-- React UI components (incoming): chart overlays/panes (BB, Ichimoku, PSAR, RSI, MACD, PPO/PVO, MFI/CMF) for fast dashboards
-- MCP Server (incoming): Model Context Protocol tools to expose indicators and data feeds to AI agents
-- Real‑time: streaming calculators for low‑latency updates (EMA/RSI/MACD/ATR/Stochastic/VWAP)
-- Proven parity + quality: fixture‑tested, ~98% coverage, strict types, tree‑shakable ESM/CJS builds
-- Designed for the browser and Node: zero native deps, robust performance with deque‑based rolling windows
+Why teams choose trAIder
+- 📦 Comprehensive indicators: trend, momentum, volatility, volume — aligned with Python ta
+- ⚡ Real‑time: streaming calculators for low‑latency updates
+- 🧩 React UI (incoming): drop‑in overlays/panes for rapid dashboards
+- 🤖 MCP Server (incoming): Model Context Protocol to expose tools to AI agents
+- ✅ Quality: parity‑tested vs fixtures, ~98% coverage, strict types, tree‑shakable builds
+- 🌐 Browser + Node: zero native deps; fast deque‑based rolling windows
 
 Install (Core)
 ```bash
 npm install tats
 ```
 
-Quickstart (Core Engine)
+Links & Technical Docs
+- 📘 Technical Analysis Engine: DOCUMENTATION-TA.md
+- 🧩 React UI Components: DOCUMENTATION-REACT.mc
+- 🤝 MCP Server (Model Context Protocol): DOCUMENTATION-MCP.md
 ```ts
-// Core package name is currently `tats` while the repo is trAIde.
-// We’ll publish under the trAIder scope when packaging is finalized.
-import { trend, momentum, volatility, volume, returns, calculators } from 'tats';
+Core package name is currently `tats` while the repo is trAIde. We’ll publish under the trAIder scope when packaging is finalized.
 
 const close = [/* numbers */];
 const high = [/* numbers */];
@@ -66,9 +67,9 @@ const emaSeq = close.map(c => ema.update(c));
 ```
 
 Quality & Parity
-- Tests mirror Python `ta` fixtures where available; tolerances are tight
-- Coverage: ~98% statements/lines, 100% functions, branches ~89%
-- See docs/API.md for the full surface and examples
+- 🧪 Tests mirror Python `ta` fixtures; tight tolerances
+- 📈 Coverage: ~98% statements/lines, 100% functions, ~89% branches
+- 📚 Full surface and examples: docs/API.md
 
 Indicator Coverage (selected)
 - Trend: SMA, EMA, MACD (+signal/diff), TRIX, Mass Index, Ichimoku (+display helpers), STC, DPO, KST, Aroon, Vortex, PSAR
@@ -77,30 +78,81 @@ Indicator Coverage (selected)
 - Volume: OBV, ADL, CMF, Force Index, Ease of Movement (+SMA), VPT (+smoothed), NVI, MFI, VWAP, Chaikin Oscillator
 - Others: Daily/Log/Cumulative Returns
 
-Architecture Notes
-- Core engine: pure, deterministic functions; warmup regions return `NaN` for alignment
-- EWM/EMA semantics match pandas (adjust=false) to align with Python ta
-- Performance: O(n) rolling min/max (deques), streaming calculators to avoid array churn
+Architecture at a glance
 
-React UI Components (incoming)
-- Headless hooks and presentational components for overlays/panes
-- Built‑ins: BBands, Ichimoku Cloud (display helpers included), PSAR, RSI, MACD/PPO/PVO, ADX, MFI/CMF, OBV, VWAP
-- Works with popular charting libs (e.g., lightweight‑charts) or custom canvas/SVG
+```mermaid
+flowchart LR
+  subgraph Data[Data Sources]
+    B1[Binance REST]:::api
+    B2[Binance WS]:::api
+    O[Other Feeds]:::api
+  end
 
-MCP Server (incoming)
-- Model Context Protocol server to expose trAIder indicators and market data as agent tools
-- Example tools: compute indicators over historical klines, stream live updates, evaluate signals
-- Enables LLM agents to reason over real‑time markets with structured, typed data
+  subgraph Engine[trAIder Core Engine]
+    I[Indicators]:::core
+    S[Streaming Calculators]:::core
+  end
+
+  subgraph UI[React UI (incoming)]
+    C[Chart Components]:::ui
+    H[Headless Hooks]:::ui
+  end
+
+  subgraph MCP[MCP Server (incoming)]
+    T1[compute_indicators]:::mcp
+    T2[stream_klines]:::mcp
+  end
+
+  Data --> Engine
+  Engine --> UI
+  Data --> MCP
+  MCP --> Agents[AI Agents / LLMs]:::ai
+  UI --> Dashboards[Dashboards & Apps]:::app
+  Engine --> Apps[Node/Browser Apps]:::app
+
+  classDef core fill:#0a84ff22,stroke:#0a84ff,color:#0a84ff
+  classDef ui fill:#8e8e9322,stroke:#8e8e93,color:#8e8e93
+  classDef mcp fill:#34c75922,stroke:#34c759,color:#34c759
+  classDef api fill:#ff9f0a22,stroke:#ff9f0a,color:#ff9f0a
+  classDef ai fill:#bf5af222,stroke:#bf5af2,color:#bf5af2
+  classDef app fill:#ffd60a22,stroke:#ffd60a,color:#9a6e00
+```
+
+MCP Server interaction
+
+```mermaid
+sequenceDiagram
+  participant App as App/Agent
+  participant MCP as trAIder MCP
+  participant Data as Data Source
+  participant Core as Indicator Engine
+
+  App->>MCP: compute_indicators(symbol, interval, windows)
+  MCP->>Data: fetch klines
+  Data-->>MCP: candles
+  MCP->>Core: run indicators
+  Core-->>MCP: results
+  MCP-->>App: structured signals/series
+
+  App->>MCP: stream_klines(symbol@interval)
+  MCP->>Data: subscribe WS
+  Data-->>MCP: live updates
+  MCP->>Core: incremental compute
+  MCP-->>App: live signals
+```
 
 Docs
-- API Reference: see docs/API.md
+- 📘 API reference: docs/API.md
+- 🔬 Engine details: DOCUMENTATION-TA.md
+- 🧩 React library: DOCUMENTATION-REACT.mc
+- 🤝 MCP server: DOCUMENTATION-MCP.md
 
 Roadmap (Near‑Term)
-- Finalize parity sweep and defaults vs Python `ta`
-- React UI component library for overlays/panes (hooks + components)
-- MCP Server to integrate indicators into AI agents
-- Demo app: historical + live Binance data (REST + WebSocket)
-- Typedoc site, examples, and strategy cookbook
+- ✅ Finalize parity sweep and defaults vs Python `ta`
+- 🧩 React UI component library (overlays/panes, hooks)
+- 🤝 MCP Server to integrate indicators with AI agents
+- 📊 Demo app: historical + live Binance (REST + WebSocket)
+- 📚 Typedoc site, examples, strategy cookbook
 
 Contributing
 - Run lint, typecheck, tests:
