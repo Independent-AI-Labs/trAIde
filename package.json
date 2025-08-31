@@ -4,12 +4,12 @@
   "description": "Technical Analysis for TypeScript (port of Python ta)",
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/Independent-AI-Labs/traAIder.git"
+    "url": "git+ssh://git@github.com/Independent-AI-Labs/trAIde.git"
   },
   "bugs": {
-    "url": "https://github.com/Independent-AI-Labs/traAIder/issues"
+    "url": "https://github.com/Independent-AI-Labs/trAIde/issues"
   },
-  "homepage": "https://github.com/Independent-AI-Labs/traAIder#readme",
+  "homepage": "https://github.com/Independent-AI-Labs/trAIde#readme",
   "type": "module",
   "main": "dist/index.cjs",
   "module": "dist/index.js",

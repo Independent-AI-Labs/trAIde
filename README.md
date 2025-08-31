@@ -1,6 +1,6 @@
 # TATS — Technical Analysis for TypeScript
 
-![CI](https://github.com/Independent-AI-Labs/traAIder/actions/workflows/ci.yml/badge.svg)
+![CI](https://github.com/Independent-AI-Labs/trAIde/actions/workflows/ci.yml/badge.svg)
 ![coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
 ![types](https://img.shields.io/badge/types-TypeScript-blue)
 
