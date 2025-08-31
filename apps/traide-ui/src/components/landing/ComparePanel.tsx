@@ -1,0 +1,54 @@
+"use client"
+import { useEffect, useMemo, useState } from 'react'
+import { MultiLineChart } from '@/components/charts/MultiLineChart'
+import { IntervalSelect } from '@/components/ui/IntervalSelect'
+
+const COLORS = ['#34d399', '#60a5fa', '#f472b6', '#fbbf24']
+
+export function ComparePanel() {
+  const [symbols, setSymbols] = useState<string[]>(['BTCUSDT', 'ETHUSDT', 'SOLUSDT'])
+  const [interval, setInterval] = useState<'1m' | '5m' | '15m' | '1h' | '4h' | '1d'>('1m')
+  const [data, setData] = useState<Record<string, { t: number; c: number }[]>>({})
+
+  useEffect(() => {
+    let cancelled = false
+    async function load(sym: string) {
+      const r = await fetch(`/api/mcp/klines?symbol=${sym}&interval=${interval}&limit=240`, { cache: 'no-cache' })
+      const j = await r.json()
+      const candles = (j?.candles || []).map((k: any) => ({ t: k.t, c: k.c }))
+      if (!cancelled) setData((d) => ({ ...d, [sym]: candles }))
+    }
+    setData({})
+    symbols.forEach((s) => { load(s) })
+    return () => { cancelled = true }
+  }, [symbols.join(','), interval])
+
+  const series = useMemo(() => {
+    return symbols.map((s, idx) => {
+      const arr = data[s] || []
+      if (!arr.length) return { id: s, color: COLORS[idx % COLORS.length]!, data: [] as { t: number; v: number }[] }
+      const base = arr[0]!.c || 1
+      return { id: s, color: COLORS[idx % COLORS.length]!, data: arr.map((d) => ({ t: d.t, v: (d.c / base) * 100 })) }
+    })
+  }, [symbols.join(','), data])
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-2">
+          {symbols.map((s, i) => (
+            <input
+              key={i}
+              className="w-28 rounded-xl border border-white/15 bg-white/5 px-2 py-1 text-xs uppercase text-white/80 outline-none"
+              value={s}
+              onChange={(e) => setSymbols((arr) => arr.map((v, idx) => (idx === i ? e.target.value.toUpperCase() : v)))}
+            />
+          ))}
+        </div>
+        <IntervalSelect value={interval} onChange={setInterval} />
+      </div>
+      <MultiLineChart series={series} className="h-60 w-full rounded-xl" />
+    </div>
+  )
+}
+

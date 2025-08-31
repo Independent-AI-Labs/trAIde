@@ -3,6 +3,9 @@ import { GlassCard } from '@/components/ui/GlassCard'
 import { WatchlistPanel } from '@/components/landing/WatchlistPanel'
 import { PlaygroundPanel } from '@/components/landing/PlaygroundPanel'
 import { StreamStatusPanel } from '@/components/landing/StreamStatusPanel'
+import { ScannerPanel } from '@/components/landing/ScannerPanel'
+import { ComparePanel } from '@/components/landing/ComparePanel'
+import { HeatmapPanel } from '@/components/landing/HeatmapPanel'
 
 export default function Page() {
   return (
@@ -19,6 +22,19 @@ export default function Page() {
           </GlassCard>
           <GlassCard title="Stream Health" subtitle="Latency · tick count" floating>
             <StreamStatusPanel />
+          </GlassCard>
+        </div>
+        <div className="mt-6 grid gap-6 md:grid-cols-2">
+          <GlassCard title="Scanner" subtitle="Change · Range · Volume · Trend">
+            <ScannerPanel />
+          </GlassCard>
+          <GlassCard title="Compare" subtitle="Normalize to 100 and compare">
+            <ComparePanel />
+          </GlassCard>
+        </div>
+        <div className="mt-6">
+          <GlassCard title="Heatmap" subtitle="Group performance (1h window)">
+            <HeatmapPanel />
           </GlassCard>
         </div>
         <div className="mt-8 flex justify-end gap-3 text-sm text-white/80">
