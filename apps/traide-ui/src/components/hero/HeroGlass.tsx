@@ -1,22 +1,19 @@
 import { GlassButton, GlassCard } from '@/components/ui/GlassCard'
 import { HeroChartLive } from '@/components/hero/HeroChartLive'
+import Link from 'next/link'
 
 export function HeroGlass() {
   return (
     <section className="relative mx-auto max-w-6xl px-6 py-20">
       <div className="grid items-center gap-10 md:grid-cols-2">
         <div>
-          <h1 className="text-5xl font-black leading-tight text-glow">
-            Real‑time Technical Analysis,
-            <br />
-            Designed to Dazzle.
-          </h1>
+          <h1 className="text-5xl font-black leading-tight text-glow">Real‑time Technical Analysis</h1>
           <p className="mt-6 text-lg text-white/80">
-            Live streaming indicators, blazing performance, and a glassmorphic interface that feels tangible. Built on the Traide MCP.
+            Live streaming indicators, blazing performance, and a glassmorphic interface that feels tangible. Built on the trAIde MCP.
           </p>
           <div className="mt-8 flex flex-wrap gap-4">
-            <GlassButton>Launch App</GlassButton>
-            <GlassButton className="bg-white/5">View GitHub</GlassButton>
+            <Link href="/app/chart/BTCUSDT" className="contents"><GlassButton>Launch App</GlassButton></Link>
+            <a href="https://github.com/Independent-AI-Labs/trAIde" target="_blank" className="contents"><GlassButton className="bg-white/5">View GitHub</GlassButton></a>
           </div>
         </div>
         <div className="relative">

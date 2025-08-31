@@ -1,7 +1,8 @@
 import { HeroGlass } from '@/components/hero/HeroGlass'
 import { GlassCard } from '@/components/ui/GlassCard'
-import { HoloSpinner } from '@/components/ui/HoloSpinner'
-import { SkeletonWave } from '@/components/ui/SkeletonWave'
+import { WatchlistPanel } from '@/components/landing/WatchlistPanel'
+import { PlaygroundPanel } from '@/components/landing/PlaygroundPanel'
+import { StreamStatusPanel } from '@/components/landing/StreamStatusPanel'
 
 export default function Page() {
   return (
@@ -10,24 +11,21 @@ export default function Page() {
 
       <section className="mx-auto mt-2 max-w-6xl px-6 pb-24">
         <div className="grid gap-6 md:grid-cols-3">
-          <GlassCard title="Scanner" subtitle="High‑impact placeholder">
-            <SkeletonWave rows={5} />
+          <GlassCard title="Watchlist" subtitle="Live mini‑charts, 1m" >
+            <WatchlistPanel />
           </GlassCard>
-          <GlassCard title="Playground" subtitle="Indicator params">
-            <div className="space-y-3">
-              <div className="h-10 rounded-lg bg-white/10" />
-              <div className="h-10 rounded-lg bg-white/10" />
-              <div className="h-10 rounded-lg bg-white/10" />
-            </div>
+          <GlassCard title="Playground" subtitle="RSI · PPO controls">
+            <PlaygroundPanel />
           </GlassCard>
-          <GlassCard title="Stream Status" subtitle="Aesthetic loader" floating>
-            <div className="flex h-40 items-center justify-center">
-              <HoloSpinner />
-            </div>
+          <GlassCard title="Stream Health" subtitle="Latency · tick count" floating>
+            <StreamStatusPanel />
           </GlassCard>
+        </div>
+        <div className="mt-8 flex justify-end gap-3 text-sm text-white/80">
+          <a className="rounded-lg border border-white/10 bg-white/5 px-3 py-2" href="/app/demo">Open Demo View</a>
+          <a className="rounded-lg border border-white/10 bg-white/5 px-3 py-2" href="/app/ux">Open UX Gallery</a>
         </div>
       </section>
     </div>
   )
 }
-
