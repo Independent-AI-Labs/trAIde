@@ -1,6 +1,6 @@
-# trAIder — AI‑Ready Technical Analysis Toolkit
+# trAIde — AI‑Ready Technical Analysis Toolkit
 
-![trAIder banner](trAIde.png)
+![trAIde banner](trAIde.png)
 
 ![CI](https://github.com/Independent-AI-Labs/trAIde/actions/workflows/ci.yml/badge.svg)
 ![coverage](https://img.shields.io/badge/coverage-98%25-brightgreen)
@@ -8,11 +8,11 @@
 
 TypeScript-first technical analysis indicators, a faithful port of Python `ta` with modern DX for Node.js and browsers. Pure functions, strict types, tree-shakable, with streaming calculators for real-time apps.
 
-What is trAIder?
+What is trAIde?
 - 🚀 Enterprise‑grade technical analysis for TypeScript — built for AI workflows, modern web apps, and trading automation.
 - 🧠 Combines a comprehensive indicator engine, real‑time streaming calculators, React UI components (incoming), and an MCP Server (incoming) to power LLM‑driven agents and dashboards.
 
-Why teams choose trAIder
+Why teams choose trAIde
 - 📦 Comprehensive indicators: trend, momentum, volatility, volume — aligned with Python ta
 - ⚡ Real‑time: streaming calculators for low‑latency updates
 - 🧩 React UI (incoming): drop‑in overlays/panes for rapid dashboards
@@ -30,7 +30,7 @@ Links & Technical Docs
 - 🧩 React UI Components: DOCUMENTATION-REACT.mc
 - 🤝 MCP Server (Model Context Protocol): DOCUMENTATION-MCP.md
 ```ts
-Core package name is currently `tats` while the repo is trAIde. We’ll publish under the trAIder scope when packaging is finalized.
+Core package name is currently `tats` while the repo is trAIde. We’ll publish under the trAIde scope when packaging is finalized.
 
 const close = [/* numbers */];
 const high = [/* numbers */];
@@ -88,7 +88,7 @@ flowchart LR
     O[Other Feeds]:::api
   end
 
-  subgraph Engine[trAIder Core Engine]
+  subgraph Engine[trAIde Core Engine]
     I[Indicators]:::core
     S[Streaming Calculators]:::core
   end
@@ -123,7 +123,7 @@ MCP Server interaction
 ```mermaid
 sequenceDiagram
   participant App as App/Agent
-  participant MCP as trAIder MCP
+  participant MCP as trAIde MCP
   participant Data as Data Source
   participant Core as Indicator Engine
 

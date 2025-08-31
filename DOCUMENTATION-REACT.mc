@@ -1,4 +1,4 @@
-# trAIder React UI — Technical Notes
+# trAIde React UI — Technical Notes
 
 Incoming headless hooks and components for building trading dashboards quickly.
 
@@ -21,4 +21,3 @@ Incoming headless hooks and components for building trading dashboards quickly.
 ## Theming & State
 - Theme‑ready components; controlled/ uncontrolled props
 - Persist UI params to URL for shareable links
-

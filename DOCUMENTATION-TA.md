@@ -1,6 +1,6 @@
-# trAIder Technical Analysis Engine — Technical Notes
+# trAIde Technical Analysis Engine — Technical Notes
 
-This document captures technical details for the trAIder core engine: indicator semantics, parity with Python `ta`, streaming calculators, and performance.
+This document captures technical details for the trAIde core engine: indicator semantics, parity with Python `ta`, streaming calculators, and performance.
 
 ## Semantics & Parity
 - Pandas EWM parity: indicators using EMA/EWM align with `adjust=false` semantics. Signals (e.g., MACD/PPO/PVO) use seeded EMA via `emaFrom` to match warm‑up.
@@ -29,4 +29,3 @@ Real‑time calculators produce the same sequences as batch functions while oper
 - Fixture parity: CSVs from Python `ta` for indicator parity.
 - Internal sanity/property tests: percentage bounds, monotonicity, internal consistency.
 - Coverage: ~98% statements/lines, 100% functions, ~89% branches; gates enforced by CI.
-

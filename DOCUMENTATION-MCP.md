@@ -1,6 +1,6 @@
-# trAIder MCP Server — Technical Notes
+# trAIde MCP Server — Technical Notes
 
-The Model Context Protocol (MCP) server exposes trAIder’s indicators and market data as structured tools for AI agents and services.
+The Model Context Protocol (MCP) server exposes trAIde’s indicators and market data as structured tools for AI agents and services.
 
 ## Goals
 - Expose historical computations and live streams via typed tools
@@ -34,4 +34,3 @@ The Model Context Protocol (MCP) server exposes trAIder’s indicators and marke
 - Rate limiting/throttling; configurable concurrency
 - Health endpoints and basic telemetry
 - Deployment: Node server or serverless functions
-
