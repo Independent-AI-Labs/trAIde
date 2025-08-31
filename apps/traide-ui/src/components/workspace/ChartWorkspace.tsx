@@ -5,7 +5,8 @@ import { TimeframeSwitch } from './TimeframeSwitch'
 import { HeroChartLive } from '@/components/hero/HeroChartLive'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SymbolInput } from '@/components/ui/SymbolInput'
-import { OverlayChart } from '@/components/charts/OverlayChart'
+import dynamic from 'next/dynamic'
+const OverlayChart = dynamic(() => import('@/components/charts/OverlayChart').then(m => m.OverlayChart), { ssr: false })
 import { useKlines } from '@/lib/data/useKlines'
 
 export function ChartWorkspace({ symbol: initialSymbol }: { symbol: string }) {

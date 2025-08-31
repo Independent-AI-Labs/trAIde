@@ -4,6 +4,7 @@ import { GroupSelect } from '@/components/ui/GroupSelect'
 import { IntervalSelect } from '@/components/ui/IntervalSelect'
 import { getGroup } from '@/lib/symbols'
 import { useFetchers } from '@/lib/data/fetchers'
+import { usePref } from '@/lib/prefs'
 import { DataTable, Column } from '@/components/ui/DataTable'
 
 type Candle = { t: number; o: number; h: number; l: number; c: number; v: number }
@@ -18,10 +19,10 @@ type Row = {
 }
 
 export function ScannerPanel() {
-  const [groupId, setGroupId] = useState('majors')
-  const [interval, setInterval] = useState<'1m' | '5m' | '15m' | '1h' | '4h' | '1d'>('1m')
-  const [lookback, setLookback] = useState(120)
-  const [minVol, setMinVol] = useState(0)
+  const [groupId, setGroupId] = usePref<string>('scanner.group', 'majors')
+  const [interval, setInterval] = usePref<'1m' | '5m' | '15m' | '1h' | '4h' | '1d'>('scanner.interval', '1m')
+  const [lookback, setLookback] = usePref<number>('scanner.lookback', 120)
+  const [minVol, setMinVol] = usePref<number>('scanner.minVol', 0)
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
   const { fetchKlinesCached } = useFetchers()
@@ -32,11 +33,10 @@ export function ScannerPanel() {
     let cancelled = false
     async function loadAll() {
       setLoading(true)
-      const out: Row[] = []
-      for (const sym of group.symbols) {
-        try {
+      const res = await Promise.allSettled(
+        group.symbols.map(async (sym) => {
           const cs = await fetchKlinesCached(sym, interval, lookback)
-          if (!cs.length) continue
+          if (!cs.length) return null
           const first = cs[0]!.c
           const last = cs[cs.length - 1]!.c
           const changePct = ((last - first) / first) * 100
@@ -45,9 +45,10 @@ export function ScannerPanel() {
           const rangePct = ((hi - lo) / first) * 100
           const vol = cs.reduce((a, b) => a + b.v, 0)
           const slope = linregSlope(cs.map((x) => x.c))
-          out.push({ symbol: sym, price: last, changePct, rangePct, vol, slope })
-        } catch {}
-      }
+          return { symbol: sym, price: last, changePct, rangePct, vol, slope } as Row
+        }),
+      )
+      const out = res.map((r) => (r.status === 'fulfilled' ? r.value : null)).filter(Boolean) as Row[]
       if (!cancelled) setRows(out)
       setLoading(false)
     }

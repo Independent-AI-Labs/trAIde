@@ -11,6 +11,8 @@ export function MiniChart({ data, className }: Props) {
   const ref = useRef<HTMLDivElement | null>(null)
   const api = useRef<IChartApi | null>(null)
   const line = useRef<ISeriesApi<'Line'> | null>(null)
+  const lastLen = useRef<number>(0)
+  const lastTs = useRef<number>(0)
 
   useEffect(() => {
     if (!ref.current) return
@@ -41,10 +43,21 @@ export function MiniChart({ data, className }: Props) {
 
   useEffect(() => {
     if (!line.current) return
-    const seriesData: LineData[] = data.map((d) => ({ time: (d.t / 1000) as UTCTimestamp, value: d.c }))
-    line.current.setData(seriesData)
+    if (!data.length) { line.current.setData([]); lastLen.current = 0; lastTs.current = 0; return }
+    const currLast = data[data.length - 1]!
+    if (data.length === lastLen.current && currLast.t === lastTs.current) {
+      line.current.update({ time: (currLast.t / 1000) as UTCTimestamp, value: currLast.c })
+    } else if (data.length === lastLen.current + 1 && data[data.length - 2]?.t === lastTs.current) {
+      line.current.update({ time: (currLast.t / 1000) as UTCTimestamp, value: currLast.c })
+      lastLen.current = data.length
+      lastTs.current = currLast.t
+    } else {
+      const seriesData: LineData[] = data.map((d) => ({ time: (d.t / 1000) as UTCTimestamp, value: d.c }))
+      line.current.setData(seriesData)
+      lastLen.current = data.length
+      lastTs.current = currLast.t
+    }
   }, [data])
 
   return <div ref={ref} className={className} />
 }
-

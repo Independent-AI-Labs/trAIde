@@ -13,6 +13,7 @@ export function useKlines({ symbol, interval, limit = 240, stream = false }: { s
 
   useEffect(() => {
     let cancelled = false
+    const ac = new AbortController()
     async function load() {
       setLoading(true)
       setError(null)
@@ -27,27 +28,41 @@ export function useKlines({ symbol, interval, limit = 240, stream = false }: { s
         if (!cancelled) setLoading(false)
       }
     }
-    load(); return () => { cancelled = true }
+    load(); return () => { cancelled = true; ac.abort() }
   }, [symbol, interval, limit])
 
   useEffect(() => {
     if (!stream) return
-    const url = `/api/mcp/stream/klines?symbol=${symbol}&interval=${interval}`
-    const es = new EventSource(url)
-    esRef.current = es
-    es.onmessage = (ev) => {
-      try {
-        const payload = JSON.parse(ev.data)
-        const k = payload?.candle
-        if (!k) return
-        if (k.t === lastTs.current) setData((s) => (s.length ? [...s.slice(0, -1), k] : [k]))
-        else if (k.t > lastTs.current) { setData((s) => [...s, k]); lastTs.current = k.t }
-        setTicks((t) => t + 1)
-      } catch {}
+    let cancelled = false
+    let retry = 0
+    let timer: any
+    const backoffBase = 500
+    const backoffMax = 8000
+    const open = () => {
+      if (cancelled) return
+      const url = `/api/mcp/stream/klines?symbol=${symbol}&interval=${interval}`
+      const es = new EventSource(url)
+      esRef.current = es
+      es.onopen = () => { retry = 0 }
+      es.onerror = () => {
+        es.close(); esRef.current = null
+        const wait = Math.min(backoffMax, Math.floor(backoffBase * Math.pow(2, retry++)))
+        timer = window.setTimeout(open, wait)
+      }
+      es.onmessage = (ev) => {
+        try {
+          const payload = JSON.parse(ev.data)
+          const k = payload?.candle
+          if (!k) return
+          if (k.t === lastTs.current) setData((s) => (s.length ? [...s.slice(0, -1), k] : [k]))
+          else if (k.t > lastTs.current) { setData((s) => [...s, k]); lastTs.current = k.t }
+          setTicks((t) => t + 1)
+        } catch {}
+      }
     }
-    return () => { es.close(); esRef.current = null }
+    open()
+    return () => { cancelled = true; if (timer) window.clearTimeout(timer); if (esRef.current) esRef.current.close(); esRef.current = null }
   }, [symbol, interval, stream])
 
   return { data, loading, error, ticks }
 }
-

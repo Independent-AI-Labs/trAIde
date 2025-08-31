@@ -20,12 +20,12 @@ export function DataTable<T extends { [k: string]: any }>({ rows, columns, defau
   return (
     <div className={className}>
       <div className="overflow-hidden rounded-xl border border-white/10">
-        <table className="w-full text-sm">
-          <thead className="bg-white/5 text-white/70">
+        <table className="w-full text-sm" role="table">
+          <thead className="bg-white/5 text-white/70" role="rowgroup">
             <tr>
               {columns.map((c) => (
-                <th key={String(c.key)} className={`px-3 py-2 font-medium ${c.align === 'right' ? 'text-right' : 'text-left'}`}>
-                  <button className="inline-flex items-center gap-1" onClick={() => { if (sortKey === c.key) setDesc(!desc); else { setSortKey(c.key); setDesc(true) } }}>
+                <th key={String(c.key)} className={`px-3 py-2 font-medium ${c.align === 'right' ? 'text-right' : 'text-left'}`} aria-sort={sortKey === c.key ? (desc ? 'descending' : 'ascending') : 'none'}>
+                  <button className="inline-flex items-center gap-1" onClick={() => { if (sortKey === c.key) setDesc(!desc); else { setSortKey(c.key); setDesc(true) } }} aria-label={`Sort by ${c.label}`}>
                     <span>{c.label}</span>
                     {sortKey === c.key ? <span className="text-xs">{desc ? '↓' : '↑'}</span> : null}
                   </button>
@@ -33,7 +33,7 @@ export function DataTable<T extends { [k: string]: any }>({ rows, columns, defau
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody role="rowgroup">
             {sorted.map((r, idx) => (
               <tr key={idx} className="border-t border-white/10 hover:bg-white/5">
                 {columns.map((c) => (
@@ -49,4 +49,3 @@ export function DataTable<T extends { [k: string]: any }>({ rows, columns, defau
     </div>
   )
 }
-
