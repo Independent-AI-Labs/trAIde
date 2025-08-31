@@ -22,7 +22,7 @@ Why teams choose trAIde
 
 Install (Core)
 ```bash
-npm install tats
+npm install traide
 ```
 
 Links & Technical Docs
@@ -47,14 +47,14 @@ Architecture at a glance
 
 ```mermaid
 graph LR
-  B1[Binance REST] --> E((Core Engine))
+  B1[Binance REST] --> E[Core Engine]
   B2[Binance WS] --> E
   O[Other Feeds] --> E
-  E --> UI[React UI (incoming)]
-  E --> APPS[Dashboards & Apps]
-  B1 -. also feeds .-> MCP[MCP Server (incoming)]
-  B2 -. also feeds .-> MCP
-  MCP --> AGENTS[AI Agents / LLMs]
+  E --> UI[React UI incoming]
+  E --> APPS[Dashboards and Apps]
+  B1 --> MCP[MCP Server incoming]
+  B2 --> MCP
+  MCP --> AGENTS[AI Agents and LLMs]
 ```
 
 MCP Server interaction
