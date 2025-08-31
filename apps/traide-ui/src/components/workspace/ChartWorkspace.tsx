@@ -1,9 +1,12 @@
 "use client"
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { GlassCard, GlassButton } from '@/components/ui/GlassCard'
 import { TimeframeSwitch } from './TimeframeSwitch'
 import { HeroChartLive } from '@/components/hero/HeroChartLive'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { SymbolInput } from '@/components/ui/SymbolInput'
+import { OverlayChart } from '@/components/charts/OverlayChart'
+import { useKlines } from '@/lib/data/useKlines'
 
 export function ChartWorkspace({ symbol: initialSymbol }: { symbol: string }) {
   const router = useRouter()
@@ -20,32 +23,30 @@ export function ChartWorkspace({ symbol: initialSymbol }: { symbol: string }) {
     window.history.replaceState(null, '', u.toString())
   }, [tf])
 
+  const { data } = useKlines({ symbol, interval: tf, limit: 300, stream: true })
+  const [ovEMA, setOvEMA] = useState(true)
+  const [ovSMA, setOvSMA] = useState(false)
+  const overlays = useMemo(() => [
+    ...(ovEMA ? [{ type: 'ema', period: 20, color: 'rgba(99,102,241,1)' } as const] : []),
+    ...(ovSMA ? [{ type: 'sma', period: 50, color: 'rgba(251,191,36,1)' } as const] : []),
+  ], [ovEMA, ovSMA])
+
   return (
     <div className="mx-auto max-w-6xl px-6 py-10">
       <div className="mb-6 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <input
-            className="w-40 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-sm uppercase tracking-wide text-white placeholder-white/50 outline-none focus:border-white/30"
-            value={symbol}
-            placeholder="SYMBOL"
-            onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && symbol.trim()) {
-                router.push(`/app/chart/${encodeURIComponent(symbol.trim().toUpperCase())}?tf=${tf}`)
-              }
-            }}
-          />
+          <SymbolInput value={symbol} onChange={(v) => setSymbol(v)} onEnter={() => router.push(`/app/chart/${encodeURIComponent(symbol.trim().toUpperCase())}?tf=${tf}`)} />
           <TimeframeSwitch value={tf} onChange={setTf} />
         </div>
         <div className="flex items-center gap-3">
-          <GlassButton className="bg-white/5">Indicators</GlassButton>
-          <GlassButton className="bg-white/5">Layouts</GlassButton>
+          <GlassButton className="bg-white/5" onClick={() => setOvEMA((v) => !v)}>{ovEMA ? 'EMA20 ✓' : 'EMA20'}</GlassButton>
+          <GlassButton className="bg-white/5" onClick={() => setOvSMA((v) => !v)}>{ovSMA ? 'SMA50 ✓' : 'SMA50'}</GlassButton>
         </div>
       </div>
 
       <GlassCard>
         <div className="relative h-[520px] w-full">
-          <HeroChartLive symbol={symbol} interval={tf} />
+          <OverlayChart data={data.map((d) => ({ t: d.t, c: d.c }))} overlays={overlays as any} className="h-[520px] w-full rounded-xl" />
         </div>
       </GlassCard>
     </div>

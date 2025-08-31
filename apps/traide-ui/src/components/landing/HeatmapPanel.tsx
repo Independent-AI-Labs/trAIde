@@ -2,12 +2,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getGroup } from '@/lib/symbols'
 import { IntervalSelect } from '@/components/ui/IntervalSelect'
+import { useFetchers } from '@/lib/data/fetchers'
 
 export function HeatmapPanel() {
   const [groupId, setGroupId] = useState('majors')
   const [interval, setInterval] = useState<'1m' | '5m' | '15m' | '1h' | '4h' | '1d'>('1m')
   const group = getGroup(groupId)
   const [rows, setRows] = useState<{ symbol: string; changePct: number }[]>([])
+  const { fetchKlinesCached } = useFetchers()
 
   useEffect(() => {
     let cancelled = false
@@ -15,9 +17,7 @@ export function HeatmapPanel() {
       const out: { symbol: string; changePct: number }[] = []
       for (const sym of group.symbols) {
         try {
-          const r = await fetch(`/api/mcp/klines?symbol=${sym}&interval=${interval}&limit=60`, { cache: 'no-cache' })
-          const j = await r.json()
-          const cs = (j?.candles || [])
+          const cs = await fetchKlinesCached(sym, interval, 60)
           if (!cs.length) continue
           const first = cs[0]!.c
           const last = cs[cs.length - 1]!.c
@@ -69,4 +69,3 @@ function colorFor(v: number, min: number, max: number) {
     return `linear-gradient(180deg, rgba(244,63,94,${0.25 + 0.35 * norm}), rgba(244,63,94,${0.1 + 0.2 * norm}))`
   }
 }
-

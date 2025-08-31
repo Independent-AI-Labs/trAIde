@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MultiLineChart } from '@/components/charts/MultiLineChart'
 import { IntervalSelect } from '@/components/ui/IntervalSelect'
+import { useFetchers } from '@/lib/data/fetchers'
 
 const COLORS = ['#34d399', '#60a5fa', '#f472b6', '#fbbf24']
 
@@ -9,13 +10,13 @@ export function ComparePanel() {
   const [symbols, setSymbols] = useState<string[]>(['BTCUSDT', 'ETHUSDT', 'SOLUSDT'])
   const [interval, setInterval] = useState<'1m' | '5m' | '15m' | '1h' | '4h' | '1d'>('1m')
   const [data, setData] = useState<Record<string, { t: number; c: number }[]>>({})
+  const { fetchKlinesCached } = useFetchers()
 
   useEffect(() => {
     let cancelled = false
     async function load(sym: string) {
-      const r = await fetch(`/api/mcp/klines?symbol=${sym}&interval=${interval}&limit=240`, { cache: 'no-cache' })
-      const j = await r.json()
-      const candles = (j?.candles || []).map((k: any) => ({ t: k.t, c: k.c }))
+      const cs = await fetchKlinesCached(sym, interval, 240)
+      const candles = cs.map((k) => ({ t: k.t, c: k.c }))
       if (!cancelled) setData((d) => ({ ...d, [sym]: candles }))
     }
     setData({})
@@ -51,4 +52,3 @@ export function ComparePanel() {
     </div>
   )
 }
-

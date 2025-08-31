@@ -3,6 +3,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { GroupSelect } from '@/components/ui/GroupSelect'
 import { IntervalSelect } from '@/components/ui/IntervalSelect'
 import { getGroup } from '@/lib/symbols'
+import { useFetchers } from '@/lib/data/fetchers'
+import { DataTable, Column } from '@/components/ui/DataTable'
 
 type Candle = { t: number; o: number; h: number; l: number; c: number; v: number }
 
@@ -20,10 +22,9 @@ export function ScannerPanel() {
   const [interval, setInterval] = useState<'1m' | '5m' | '15m' | '1h' | '4h' | '1d'>('1m')
   const [lookback, setLookback] = useState(120)
   const [minVol, setMinVol] = useState(0)
-  const [sortBy, setSortBy] = useState<keyof Row>('changePct')
-  const [desc, setDesc] = useState(true)
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
+  const { fetchKlinesCached } = useFetchers()
 
   const group = getGroup(groupId)
 
@@ -34,9 +35,7 @@ export function ScannerPanel() {
       const out: Row[] = []
       for (const sym of group.symbols) {
         try {
-          const r = await fetch(`/api/mcp/klines?symbol=${sym}&interval=${interval}&limit=${lookback}`, { cache: 'no-cache' })
-          const j = await r.json()
-          const cs: Candle[] = (j?.candles || []).map((k: any) => ({ t: k.t, o: k.o, h: k.h, l: k.l, c: k.c, v: k.v }))
+          const cs = await fetchKlinesCached(sym, interval, lookback)
           if (!cs.length) continue
           const first = cs[0]!.c
           const last = cs[cs.length - 1]!.c
@@ -56,11 +55,15 @@ export function ScannerPanel() {
   }, [groupId, interval, lookback])
 
   const filtered = useMemo(() => rows.filter((r) => r.vol >= minVol), [rows, minVol])
-  const sorted = useMemo(() => [...filtered].sort((a, b) => {
-    const va = a[sortBy]
-    const vb = b[sortBy]
-    return (desc ? -1 : 1) * (va === vb ? 0 : va > vb ? 1 : -1)
-  }), [filtered, sortBy, desc])
+  const cols: Column<Row>[] = [
+    { key: 'symbol', label: 'Symbol' },
+    { key: 'price', label: 'Price', align: 'right', render: (r) => fmt(r.price) },
+    { key: 'changePct', label: 'Change%', align: 'right', render: (r) => <span className={r.changePct >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{r.changePct.toFixed(2)}%</span> },
+    { key: 'rangePct', label: 'Range%', align: 'right', render: (r) => <span className={r.rangePct >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{r.rangePct.toFixed(2)}%</span> },
+    { key: 'vol', label: 'Volume', align: 'right', render: (r) => fmt(r.vol) },
+    { key: 'slope', label: 'Trend', align: 'right', render: (r) => <span className={r.slope >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{r.slope.toFixed(4)}</span> },
+    { key: 'symbol', label: 'Open', align: 'right', render: (r) => <a className="rounded-lg bg-white/5 px-2 py-1" href={`/app/chart/${r.symbol}`}>Chart</a> },
+  ]
 
   return (
     <div className="space-y-3">
@@ -84,43 +87,13 @@ export function ScannerPanel() {
         </label>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-white/10">
-        <table className="w-full text-sm">
-          <thead className="bg-white/5 text-white/70">
-            <tr>
-              <th className="px-3 py-2 text-left font-medium">Symbol</th>
-              <th className="px-3 py-2 text-right font-medium">Price</th>
-              <th className="px-3 py-2 text-right font-medium">Change%</th>
-              <th className="px-3 py-2 text-right font-medium">Range%</th>
-              <th className="px-3 py-2 text-right font-medium">Volume</th>
-              <th className="px-3 py-2 text-right font-medium">Trend</th>
-              <th className="px-3 py-2 text-right font-medium">Open</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr><td colSpan={7} className="px-3 py-6 text-center text-white/60">Loading…</td></tr>
-            )}
-            {!loading && sorted.map((r) => (
-              <tr key={r.symbol} className="border-t border-white/10 hover:bg-white/5">
-                <td className="px-3 py-2 font-medium text-white/90">{r.symbol}</td>
-                <td className="px-3 py-2 text-right">{fmt(r.price)}</td>
-                <td className={cls(r.changePct)}>{r.changePct.toFixed(2)}%</td>
-                <td className={cls(r.rangePct)}>{r.rangePct.toFixed(2)}%</td>
-                <td className="px-3 py-2 text-right">{fmt(r.vol)}</td>
-                <td className={cls(r.slope)}>{r.slope.toFixed(4)}</td>
-                <td className="px-3 py-2 text-right"><a className="rounded-lg bg-white/5 px-2 py-1" href={`/app/chart/${r.symbol}`}>Chart</a></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+      {loading ? (
+        <div className="rounded-xl border border-white/10 px-3 py-6 text-center text-white/60">Loading…</div>
+      ) : (
+        <DataTable rows={filtered} columns={cols} defaultSort={{ key: 'changePct', desc: true }} />
+      )}
     </div>
   )
-}
-
-function cls(v: number) {
-  return `px-3 py-2 text-right ${v >= 0 ? 'text-emerald-300' : 'text-rose-300'}`
 }
 
 function fmt(n: number) {
@@ -140,4 +113,3 @@ function linregSlope(vals: number[]) {
   for (let i = 0; i < n; i++) { const dx = xs[i]! - xMean; num += dx * (vals[i]! - yMean); den += dx * dx }
   return den ? num / den : 0
 }
-
