@@ -1,6 +1,23 @@
-# TATS TODO — Porting Python `ta` to TypeScript
+# trAIde TODO — Status, Next, and Roadmap
 
 This is a living checklist to complete feature parity with the Python `ta` library, ensure robust tests, and reach/maintain 95%+ coverage.
+
+
+## Status Summary
+- Completed:
+  - Core indicators parity sweep largely complete; many items checked below.
+  - Streaming calculators implemented: EMA, RSI, MACD, ATR, Stochastic, VWAP, PPO, PVO.
+  - MCP server scaffolded: health/symbols/klines/indicators; SSE streaming; metrics; rate limiting; CORS allowlist.
+  - Binance REST adapter; WS adapter with reconnect + replay; heartbeats.
+  - Tests: extensive unit + integration; REST e2e runs by default; WS e2e auto-runs when `ws` available.
+  - CI: Node 18/20 matrix with build, lint, typecheck, tests, REST e2e.
+  - Repo: renamed to `traide`; npm workspaces enabled.
+- In Progress / Next (high-priority):
+  - Dockerize MCP and add compose; GHCR image publish in CI.
+  - Tighten MCP JSON Schemas (compute_indicators/stream_klines) and doc them.
+  - README/docs: deployment, CORS/auth envs, operations.
+  - Provider hardening (REST retry/backoff & pagination), proxy support.
+  - Observability (prom-client, pino logs), and more streaming deltas (e.g., STC, Bollinger signals).
 
 ## Goals
 - [ ] 1:1 feature parity with Python `ta` (latest pinned version in this repo).
@@ -86,11 +103,11 @@ This is a living checklist to complete feature parity with the Python `ta` libra
 
 ### Next Steps (Actionable)
 1) Parity sweep across all indicators vs fixtures; add any missing fixtures
-2) Add streaming calculators (incremental) for EMA/RSI/MACD/ATR/Stoch/VWAP
+2) Add streaming calculators (incremental) for EMA/RSI/MACD/ATR/Stoch/VWAP [DONE] + PPO/PVO [DONE]
 3) Generate Typedoc and publish docs site (VitePress)
 4) Create `apps/demo` and implement Milestones 1–3
-5) Wire WS streaming (Milestone 6); measure perf and optimize
-6) CI: lint, typecheck, test, build + demo deploy
+5) Wire WS streaming (Milestone 6); measure perf and optimize [DONE]
+6) CI: lint, typecheck, test, build + demo deploy [DONE for core + MCP]
 
 
 ## MCP Server Roadmap (Next Items)
@@ -171,3 +188,56 @@ This is a living checklist to complete feature parity with the Python `ta` libra
 ---
 
 Scope note: keep implementations minimal and faithful to upstream; avoid unrelated refactors until parity is complete.
+# trAIde TODO — Pending Work Only
+
+This file tracks only what remains to be done. Completed items have been removed for clarity.
+
+## High‑Level
+- Interactive demo (React + Binance): build and ship initial version.
+- Documentation site (Typedoc + guide docs) with deployment.
+
+## Demo (React + Binance)
+- Scaffold `apps/demo` (Vite React) in the workspace.
+- Load historical klines; render chart with BB/RSI/MACD overlays.
+- Indicator picker + parameters; recompute on change.
+- Overlays/panes: Ichimoku cloud, PSAR, PPO/PVO panels, Volume (OBV, CMF, MFI).
+- WebSocket live kline updates; incremental recompute.
+- Persist UI in URL; theme toggle.
+- CI deploy demo (Pages/Vercel) on main.
+
+## MCP Server — Next Items
+- Dockerize MCP: add `packages/traide-mcp/Dockerfile` and optional `docker-compose.yml`; publish GHCR image in CI.
+- Tighten JSON Schemas: full schemas for `compute_indicators` (required, types, bounds) and `stream_klines`; add explicit schemas for `list_symbols` and `health`.
+- Docs/README: deployment (Docker/compose), CORS/auth envs, CI badges, and an OPERATIONS guide.
+- Provider hardening: REST retry/backoff, time‑window pagination, proxy support; unit tests with mocked fetch/ws.
+- Observability: switch to prom‑client metrics, pino logs with request IDs; optional tracing hooks.
+- Workspace polish: consider moving core to `packages/traide-core` and depend from MCP via workspace.
+- CI release: npm publish for `traide` and GHCR image for MCP; changelog/tagging automation.
+- Streaming coverage: add deltas for more indicators (e.g., STC, Bollinger signals).
+- Tests: unskip SSE integration test once stable in CI; add WS reconnection unit tests (fake WS).
+- Security: bearer auth for SSE; tune rate limiting; document `MCP_CORS_ORIGINS` usage.
+
+## Parity/Correctness
+- Parity sweep across all indicators vs upstream fixtures; add missing fixtures if any.
+- Verify function signatures/defaults match Python `ta`.
+- Align NaN policy and `fillna` semantics; consider `fillna?: boolean | number`.
+
+## Tests & Coverage
+- Port/extend remaining fixture tests (if gaps remain).
+- Unit tests for math utils (SMA/EMA/WilderRMA/std/trueRange/highest/lowest) edge cases and NaN handling.
+- Property tests where valuable (invariants, bounds).
+- Keep coverage ≥ 95% with gates in CI.
+
+## API & DX
+- Options objects for indicators (e.g., fillna, NaN handling, return shapes).
+- Typedoc reference and examples; migration notes from Python `ta`.
+
+## Performance
+- Continue optimizing rolling windows with deques where applicable; micro‑bench comparisons; document Big‑O.
+
+## CI/Release
+- Release workflow: npm publish (core) and GHCR image publish (MCP), with changelog and signed provenance.
+
+## Validation
+- Cross‑language parity harness (Python ta vs TS) for random series/windows; auto‑diff results.
+- Manual spot‑checks around warm‑ups and edge cases.
