@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { GlassCard, GlassButton } from '@/components/ui/GlassCard'
 import { TimeframeSwitch } from './TimeframeSwitch'
-import { HeroChartLive } from '@/components/hero/HeroChartLive'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SymbolInput } from '@/components/ui/SymbolInput'
 import dynamic from 'next/dynamic'

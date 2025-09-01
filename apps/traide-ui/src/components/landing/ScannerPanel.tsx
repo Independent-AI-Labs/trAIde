@@ -8,7 +8,7 @@ import { usePref } from '@/lib/prefs'
 import { DataTable, Column } from '@/components/ui/DataTable'
 import { useIdlePrefetch } from '@/lib/data/prefetch'
 
-type Candle = { t: number; o: number; h: number; l: number; c: number; v: number }
+// candle type kept implicit via fetchers; avoid unused type warning
 
 type Row = {
   symbol: string

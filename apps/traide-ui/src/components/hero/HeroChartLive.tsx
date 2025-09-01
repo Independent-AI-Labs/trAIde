@@ -1,7 +1,6 @@
 "use client"
-import { useMcpConfig } from '@/lib/config'
 import { useSSE } from '@/lib/useSSE'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { MiniChart } from '../charts/MiniChart'
 import { StatusPill } from '@/components/ui/StatusPill'
 
@@ -14,12 +13,10 @@ type KlineEvent = {
 }
 
 export function HeroChartLive({ symbol = 'BTCUSDT', interval = '1m' }: { symbol?: string; interval?: string }) {
-  const { baseUrl } = useMcpConfig()
   // Proxy through same-origin to avoid CORS, the server route forwards to baseUrl
   const url = `/api/mcp/stream/klines?symbol=${symbol}&interval=${interval}&indicators=ppo,rsi`
   const { last, connected } = useSSE<KlineEvent>(url, true)
   const [series, setSeries] = useState<{ t: number; c: number }[]>([])
-  const [loading, setLoading] = useState(true)
   const lastTs = useRef<number>(0)
 
   useEffect(() => {
@@ -42,7 +39,6 @@ export function HeroChartLive({ symbol = 'BTCUSDT', interval = '1m' }: { symbol?
   useEffect(() => {
     let cancelled = false
     async function load() {
-      setLoading(true)
       try {
         const r = await fetch(`/api/mcp/klines?symbol=${symbol}&interval=${interval}&limit=200`, { cache: 'no-cache' })
         if (!r.ok) throw new Error('history_fetch_error')
@@ -55,7 +51,7 @@ export function HeroChartLive({ symbol = 'BTCUSDT', interval = '1m' }: { symbol?
       } catch {
         // ignore for now
       } finally {
-        if (!cancelled) setLoading(false)
+        // noop
       }
     }
     load()

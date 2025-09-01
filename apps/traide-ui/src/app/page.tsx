@@ -38,8 +38,7 @@ export default function Page() {
           </GlassCard>
         </div>
         <div className="mt-8 flex justify-end gap-3 text-sm text-white/80">
-          <a className="rounded-lg border border-white/10 bg-white/5 px-3 py-2" href="/app/demo">Open Demo View</a>
-          <a className="rounded-lg border border-white/10 bg-white/5 px-3 py-2" href="/app/ux">Open UX Gallery</a>
+          <a className="rounded-lg border border-white/10 bg-white/5 px-3 py-2" href="/app/dashboard">Open Dashboard</a>
         </div>
       </section>
     </div>

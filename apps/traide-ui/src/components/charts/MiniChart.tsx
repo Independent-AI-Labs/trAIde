@@ -1,5 +1,5 @@
 "use client"
-import { createChart, IChartApi, ISeriesApi, LineData, UTCTimestamp } from 'lightweight-charts'
+import { createChart, IChartApi, ISeriesApi, AreaData, UTCTimestamp } from 'lightweight-charts'
 import { useEffect, useRef } from 'react'
 
 type Props = {
@@ -10,7 +10,7 @@ type Props = {
 export function MiniChart({ data, className }: Props) {
   const ref = useRef<HTMLDivElement | null>(null)
   const api = useRef<IChartApi | null>(null)
-  const line = useRef<ISeriesApi<'Line'> | null>(null)
+  const line = useRef<ISeriesApi<'Area'> | null>(null)
   const lastLen = useRef<number>(0)
   const lastTs = useRef<number>(0)
 
@@ -20,7 +20,7 @@ export function MiniChart({ data, className }: Props) {
       width: ref.current.clientWidth,
       height: ref.current.clientHeight,
       autoSize: true,
-      layout: { background: { type: 'solid', color: 'transparent' }, textColor: 'rgba(255,255,255,0.82)' },
+      layout: { background: { color: 'transparent' }, textColor: 'rgba(255,255,255,0.82)' },
       grid: { vertLines: { color: 'rgba(255,255,255,0.06)' }, horzLines: { color: 'rgba(255,255,255,0.06)' } },
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false },
@@ -52,7 +52,7 @@ export function MiniChart({ data, className }: Props) {
       lastLen.current = data.length
       lastTs.current = currLast.t
     } else {
-      const seriesData: LineData[] = data.map((d) => ({ time: (d.t / 1000) as UTCTimestamp, value: d.c }))
+      const seriesData: AreaData[] = data.map((d) => ({ time: (d.t / 1000) as UTCTimestamp, value: d.c }))
       line.current.setData(seriesData)
       lastLen.current = data.length
       lastTs.current = currLast.t

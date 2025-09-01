@@ -4,7 +4,7 @@ import { cookies } from 'next/headers'
 export const runtime = 'nodejs'
 
 // naive in-memory cache for /klines GET to reduce upstream load
-const cache = new Map<string, { body: Uint8Array; ct: string; exp: number }>()
+const cache = new Map<string, { body: ArrayBuffer; ct: string; exp: number }>()
 const TTL_MS = 10_000
 
 function targetBase() {
@@ -52,11 +52,9 @@ async function proxy(req: NextRequest, init?: RequestInit) {
     })
   }
   // Otherwise return as-is with JSON/text
-  const bodyBuf = new Uint8Array(await res.arrayBuffer())
-  if (isKlines && res.ok) {
-    cache.set(url, { body: bodyBuf, ct, exp: Date.now() + TTL_MS })
-  }
-  return new Response(bodyBuf, { status: res.status, headers: { 'content-type': ct || 'application/json', 'x-proxy-target': url } })
+  const ab = await res.arrayBuffer()
+  if (isKlines && res.ok) cache.set(url, { body: ab, ct, exp: Date.now() + TTL_MS })
+  return new Response(ab, { status: res.status, headers: { 'content-type': ct || 'application/json', 'x-proxy-target': url } })
 }
 
 export async function GET(req: NextRequest) { return proxy(req) }

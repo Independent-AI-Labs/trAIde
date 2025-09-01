@@ -17,7 +17,7 @@ export function OverlayChart({ data, overlays = [], className }: { data: Price[]
       width: ref.current.clientWidth,
       height: ref.current.clientHeight,
       autoSize: true,
-      layout: { background: { type: 'solid', color: 'transparent' }, textColor: 'rgba(255,255,255,0.82)' },
+      layout: { background: { color: 'transparent' }, textColor: 'rgba(255,255,255,0.82)' },
       grid: { vertLines: { color: 'rgba(255,255,255,0.06)' }, horzLines: { color: 'rgba(255,255,255,0.06)' } },
       rightPriceScale: { borderVisible: false },
       timeScale: { borderVisible: false },
@@ -64,4 +64,3 @@ function sma(values: number[], period: number) {
   }
   return out
 }
-

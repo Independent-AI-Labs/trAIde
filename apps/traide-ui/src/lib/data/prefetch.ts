@@ -2,7 +2,7 @@
 import { useEffect } from 'react'
 import { useFetchers } from './fetchers'
 
-declare global { interface Window { requestIdleCallback?: (cb: () => void, opts?: { timeout: number }) => number } }
+// Use native requestIdleCallback if available; otherwise fallback to setTimeout
 
 export function useIdlePrefetch(symbols: string[], interval: string, limit = 240) {
   const { fetchKlinesCached } = useFetchers()
@@ -13,4 +13,3 @@ export function useIdlePrefetch(symbols: string[], interval: string, limit = 240
     return () => { try { if (!window.requestIdleCallback) window.clearTimeout(id) } catch {} }
   }, [symbols.join(','), interval, limit])
 }
-

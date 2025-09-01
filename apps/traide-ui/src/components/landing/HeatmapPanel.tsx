@@ -65,10 +65,8 @@ function colorFor(v: number, min: number, max: number) {
   const clamp = (x: number, a: number, b: number) => Math.max(a, Math.min(b, x))
   const norm = v >= 0 ? (max ? clamp(v / max, 0, 1) : 0) : (min ? clamp(v / min, 0, 1) : 0)
   if (v >= 0) {
-    const g = Math.round(200 + 55 * norm)
     return `linear-gradient(180deg, rgba(16,185,129,${0.25 + 0.35 * norm}), rgba(16,185,129,${0.1 + 0.2 * norm}))`
   } else {
-    const r = Math.round(244)
     return `linear-gradient(180deg, rgba(244,63,94,${0.25 + 0.35 * norm}), rgba(244,63,94,${0.1 + 0.2 * norm}))`
   }
 }
