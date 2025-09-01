@@ -1,6 +1,6 @@
-// Minimal HTTP + SSE server for live klines using Binance WS (CommonJS)
-const http = require('http')
-const { WebSocket } = require('ws')
+// Minimal HTTP + SSE server for live klines using Binance WS (ESM)
+import http from 'node:http'
+import { WebSocket } from 'ws'
 
 const BINANCE_REST = process.env.BINANCE_REST_URL || 'https://api.binance.com/api/v3'
 
