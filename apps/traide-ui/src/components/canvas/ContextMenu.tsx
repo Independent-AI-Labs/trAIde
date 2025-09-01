@@ -14,7 +14,12 @@ export function ContextMenu({ x, y, onClose, children }: { x: number; y: number;
     return () => { document.removeEventListener('mousedown', onDoc); document.removeEventListener('keydown', onEsc) }
   }, [onClose])
   return (
-    <div ref={ref} className="fixed z-50 w-56 rounded-lg border border-white/10 bg-black/80 p-1 text-sm shadow-xl backdrop-blur" style={{ left: x, top: y }}>
+    <div
+      ref={ref}
+      className="fixed z-50 w-56 rounded-lg border border-white/10 bg-black/80 p-1 text-sm shadow-xl backdrop-blur ui-overlay"
+      style={{ left: x, top: y }}
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation() }}
+    >
       {children}
     </div>
   )
@@ -31,4 +36,3 @@ export function MenuItem({ onClick, children }: { onClick?: () => void; children
 export function MenuSep() {
   return <div className="my-1 h-px w-full bg-white/10" />
 }
-

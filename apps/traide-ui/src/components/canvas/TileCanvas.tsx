@@ -88,6 +88,11 @@ export function TileCanvas() {
   const [savingName, setSavingName] = useState('')
   const [layoutOpen, setLayoutOpen] = useState(false)
   const onContextMenu = useCallback((e: React.MouseEvent) => {
+    // Ignore right-clicks originating from overlay UIs
+    const target = e.target as HTMLElement
+    if (target && (target.closest('.ui-overlay') || target.closest('[data-ui-overlay="1"]'))) {
+      return
+    }
     e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY })
   }, [])
   const addTile = useCallback((kind: TileKind) => {
@@ -168,12 +173,16 @@ export function TileCanvas() {
 
       {/* Layout quick menu */}
       <div className="pointer-events-none absolute left-3 top-3 z-20">
-        <div className="pointer-events-auto inline-flex gap-2 rounded-xl border border-white/10 bg-white/10 p-2 backdrop-blur">
+        <div
+          className="pointer-events-auto inline-flex gap-2 rounded-xl border border-white/10 bg-white/10 p-2 backdrop-blur ui-overlay"
+          data-ui-overlay="1"
+          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation() }}
+        >
           <button className="rounded-lg bg-white/10 px-2 py-1 text-xs text-white/80 hover:bg-white/15" onClick={() => setLayoutOpen(v => !v)}>
             Layouts
           </button>
           {layoutOpen && (
-            <div className="absolute mt-10 w-64 rounded-xl border border-white/10 bg-base-900/95 p-3 text-sm text-white/80 shadow-depth">
+            <div className="absolute mt-10 w-64 rounded-xl border border-white/10 bg-base-900/95 p-3 text-sm text-white/80 shadow-depth ui-overlay" data-ui-overlay="1">
               <div className="mb-2 text-xs uppercase tracking-wide text-white/60">Saved Layouts</div>
               <div className="max-h-48 space-y-1 overflow-auto">
                 {Object.keys(layouts).length === 0 && <div className="text-white/50">No saved layouts</div>}
