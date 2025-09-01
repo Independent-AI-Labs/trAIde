@@ -3,10 +3,10 @@
 This document captures technical details for the trAIde core engine: indicator semantics, parity with Python `ta`, streaming calculators, and performance.
 
 ## Semantics & Parity
-- Pandas EWM parity: indicators using EMA/EWM align with `adjust=false` semantics. Signals (e.g., MACD/PPO/PVO) use seeded EMA via `emaFrom` to match warm‑up.
-- Warm‑up policy: functions return `NaN` until the window is satisfied; tests assert this alignment against fixtures.
-- Wilder smoothing: RSI/ATR/ADX use RMA/Wilder’s smoothing (initial SMA, then recursive smoothing) matching `ta`.
-- Rolling windows: Bollinger/Donchian/Ulcer use windowed statistics; performance‑optimized via deque helpers where applicable.
+- EMA/EWM parity: indicators using EMA align with Pandas `adjust=false` semantics. Signals (MACD/PPO/PVO) use seeded EMA via an "EMA-from" warm‑start to match warm‑up.
+- Warm‑up policy: functions return `NaN` until the window is satisfied; streaming calculators match batch warm‑ups.
+- Wilder smoothing: RSI and ATR use RMA/Wilder’s smoothing (initial SMA, then recursive smoothing) matching `ta`.
+- Rolling windows: Bollinger/Donchian/Ulcer use windowed statistics; deques used for rolling min/max in streaming versions.
 
 ## Indicator Surface (selected)
 - Trend: SMA, EMA, MACD (+signal/diff), TRIX, Mass Index, Ichimoku (+display helpers), STC, DPO, KST, Aroon, Vortex, PSAR
@@ -17,8 +17,9 @@ This document captures technical details for the trAIde core engine: indicator s
 
 ## Streaming Calculators
 Real‑time calculators produce the same sequences as batch functions while operating O(1)/tick.
-- EMA/RSI/MACD/ATR/Stochastic/VWAP calculators: stateful classes mirroring batch warm‑up & smoothing.
-- Incremental Ichimoku/PSAR can be added for live updates in UI.
+- Implemented: EMA, RSI, MACD, ATR, Stochastic, VWAP, PPO, PVO (see `src/calculators.ts`).
+- Notes: seeded EMA (“EmaFrom”) ensures MACD/PPO/PVO signal parity; RSI uses equivalent alpha to Pandas EWM.
+- Potential: incremental Ichimoku/PSAR for enhanced live overlays.
 
 ## Performance
 - Rolling extremes via deques (highest/lowest) for O(n) windows.
@@ -26,6 +27,6 @@ Real‑time calculators produce the same sequences as batch functions while oper
 - Browser‑friendly: pure TypeScript, no native addons.
 
 ## Testing & Coverage
-- Fixture parity: CSVs from Python `ta` for indicator parity.
-- Internal sanity/property tests: percentage bounds, monotonicity, internal consistency.
-- Coverage: ~98% statements/lines, 100% functions, ~89% branches; gates enforced by CI.
+- Fixture parity: CSVs from Python `ta` for indicator parity (selected indicators); additional fixtures planned.
+- Unit/property tests: percentage bounds, monotonicity, internal consistency, and math utility edge cases.
+- Coverage: high coverage with Vitest + c8; CI enforces thresholds at the repo level.

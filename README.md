@@ -68,9 +68,9 @@ flowchart LR
 ```
 
 Docs 📚
-- 📦 TA engine: [DOCUMENTATION-TA.md](DOCUMENTATION-TA.md), [docs/API.md](docs/API.md)
-- 🎨 UI: [DOCUMENTATION-REACT.mc](DOCUMENTATION-REACT.mc), [SPEC-UI.md](SPEC-UI.md), [SPEC-REACT-COMP.md](SPEC-REACT-COMP.md)
-- 🧠 MCP: [DOCUMENTATION-MCP.md](DOCUMENTATION-MCP.md)
+- 📦 TA engine: [docs/DOCUMENTATION-TA.md](docs/DOCUMENTATION-TA.md), [docs/API.md](docs/API.md)
+- 🎨 UI: [docs/DOCUMENTATION-REACT.mc](docs/DOCUMENTATION-REACT.mc)
+- 🧠 MCP: [docs/DOCUMENTATION-MCP.md](docs/DOCUMENTATION-MCP.md)
 
 Contributing 🤝
 - ✅ Lint, typecheck, and tests are expected before PRs.
