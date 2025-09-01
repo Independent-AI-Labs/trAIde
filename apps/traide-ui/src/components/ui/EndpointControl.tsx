@@ -2,6 +2,7 @@
 import { useMcpConfig } from '@/lib/config'
 import { useEffect, useRef, useState } from 'react'
 import { GlassButton } from './GlassCard'
+import { useToast } from './Toast'
 import React from 'react'
 
 function GearIcon({ className = 'h-4 w-4' }: { className?: string }) {
@@ -18,6 +19,7 @@ export function EndpointControl() {
   const [val, setVal] = useState(baseUrl)
   const [open, setOpen] = useState(false)
   const boxRef = useRef<HTMLDivElement | null>(null)
+  const toast = useToast()
 
   useEffect(() => {
     if (!open) return
@@ -43,7 +45,7 @@ export function EndpointControl() {
           <GearIcon className="h-4 w-4" />
         </button>
       ) : (
-        <div ref={boxRef} className="absolute right-0 z-20 w-[380px] rounded-2xl border border-white/10 bg-base-900/95 p-3 shadow-depth backdrop-blur-md" onMouseDown={(e) => e.stopPropagation()}>
+        <div ref={boxRef} className="absolute right-0 z-20 w-[400px] rounded-2xl border border-white/10 bg-base-900/95 p-3 shadow-depth backdrop-blur-md" onMouseDown={(e) => e.stopPropagation()}>
           <div className="text-xs text-white/80">Settings</div>
           <div className="mt-2 text-[11px] text-white/60">MCP Base URL</div>
           <input
@@ -52,9 +54,29 @@ export function EndpointControl() {
             value={val}
             onChange={(e) => setVal(e.target.value)}
           />
-          <div className="mt-3 flex items-center justify-end gap-2">
-            <GlassButton className="bg-white/5" onClick={() => { setOpen(false); setVal(baseUrl) }}>Cancel</GlassButton>
-            <GlassButton className="bg-white/10" onClick={() => { setBaseUrl(val.trim()); setOpen(false) }}>Save</GlassButton>
+          <div className="mt-3 flex flex-col gap-2">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-[11px] text-white/60">Layouts</div>
+              <div className="flex gap-2">
+                <GlassButton
+                  className="bg-white/5"
+                  onClick={() => {
+                    try {
+                      localStorage.removeItem('traide.landing.tiles.v1')
+                      localStorage.removeItem('traide.landing.tiles.v1.layouts')
+                      toast.push('Landing layout reset. Reloading…')
+                      setTimeout(() => window.location.reload(), 400)
+                    } catch {}
+                  }}
+                >
+                  Reset Landing Layout
+                </GlassButton>
+              </div>
+            </div>
+            <div className="mt-1 flex items-center justify-end gap-2">
+              <GlassButton className="bg-white/5" onClick={() => { setOpen(false); setVal(baseUrl) }}>Cancel</GlassButton>
+              <GlassButton className="bg-white/10" onClick={() => { setBaseUrl(val.trim()); setOpen(false); toast.push('Endpoint saved') }}>Save</GlassButton>
+            </div>
           </div>
         </div>
       )}

@@ -4,7 +4,7 @@ import { MCPConfigProvider } from '@/lib/config'
 import { NetConfigProvider } from '@/lib/net/config'
 import { MarketCacheProvider } from '@/lib/data/market-cache'
 import { ToastProvider } from '@/components/ui/Toast'
-import { EndpointControl } from '@/components/ui/EndpointControl'
+import { FloatingHeader } from '@/components/ui/FloatingHeader'
 
 export const metadata = {
   title: 'Traide — Technical Analysis Platform',
@@ -21,7 +21,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             <ToastProvider>
               <main className="relative min-h-screen">
                 <div className="pointer-events-none absolute inset-0 holo-ring opacity-20 blur-3xl" />
-                <div className="fixed right-6 top-6 z-50"><EndpointControl /></div>
+                <FloatingHeader />
                 {children}
               </main>
             </ToastProvider>
