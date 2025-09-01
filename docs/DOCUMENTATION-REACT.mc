@@ -23,6 +23,13 @@ The UI is a Next.js app that renders a glass‑styled landing and a simple TA wo
 - Next API route `/api/mcp/[...path]` forwards to MCP; caches `GET /klines` for ~10s and streams SSE through for `/stream/klines`.
 - Base URL is set by `NEXT_PUBLIC_MCP_BASE_URL` or the `mcp` cookie. The config UI normalizes and persists changes.
 
+### SSE Base Resolution
+- Client code builds SSE URLs via `sseUrl(path)` from `apps/traide-ui/src/lib/mcp.ts`.
+- Behavior:
+  - If `NEXT_PUBLIC_MCP_BASE_URL` is set or a `mcp` cookie exists, it returns an absolute URL to the MCP server (offloading the connection from Next’s origin).
+  - Otherwise it proxies requests through the Next route at `/api/mcp/*`.
+- This avoids CORS issues by default while allowing explicit override in dev/production.
+
 ## Notes
 - Stream tick handling currently updates state per event; consider rAF batching for heavy pages.
 - Keep indicator calculation on server for consistency; client calculators exist for live deltas rendering.
