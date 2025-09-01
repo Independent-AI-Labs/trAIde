@@ -1,6 +1,7 @@
 "use client"
 import { useEffect, useRef, useState } from 'react'
 import { Kline, useFetchers } from './fetchers'
+import { sseUrl } from '@/lib/mcp'
 
 export function useKlines({ symbol, interval, limit = 240, stream = false }: { symbol: string; interval: string; limit?: number; stream?: boolean }) {
   const { fetchKlinesCached } = useFetchers()
@@ -40,8 +41,7 @@ export function useKlines({ symbol, interval, limit = 240, stream = false }: { s
     const backoffMax = 8000
     const open = () => {
       if (cancelled) return
-      const url = `/api/mcp/stream/klines?symbol=${symbol}&interval=${interval}`
-      const es = new EventSource(url)
+      const es = new EventSource(sseUrl(`/stream/klines?symbol=${symbol}&interval=${interval}`))
       esRef.current = es
       es.onopen = () => { retry = 0 }
       es.onerror = () => {

@@ -1,6 +1,7 @@
 "use client"
 import { StatusPill } from '@/components/ui/StatusPill'
 import { useEffect, useRef, useState } from 'react'
+import { sseUrl } from '@/lib/mcp'
 
 export function StreamStatusPanel() {
   const [ticks, setTicks] = useState(0)
@@ -8,8 +9,7 @@ export function StreamStatusPanel() {
   const esRef = useRef<EventSource | null>(null)
 
   useEffect(() => {
-    const url = `/api/mcp/stream/klines?symbol=BTCUSDT&interval=1m`
-    const es = new EventSource(url)
+    const es = new EventSource(sseUrl('/stream/klines?symbol=BTCUSDT&interval=1m'))
     esRef.current = es
     es.onmessage = () => { setTicks((t) => t + 1); setLast(Date.now()) }
     return () => { es.close(); esRef.current = null }
@@ -27,4 +27,3 @@ export function StreamStatusPanel() {
     </div>
   )
 }
-

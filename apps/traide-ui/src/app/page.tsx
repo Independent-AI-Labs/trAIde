@@ -7,6 +7,8 @@ import { ScannerPanel } from '@/components/landing/ScannerPanel'
 import { ComparePanel } from '@/components/landing/ComparePanel'
 import { HeatmapPanel } from '@/components/landing/HeatmapPanel'
 
+import Link from 'next/link'
+
 export default function Page() {
   return (
     <div className="relative">
@@ -38,7 +40,7 @@ export default function Page() {
           </GlassCard>
         </div>
         <div className="mt-8 flex justify-end gap-3 text-sm text-white/80">
-          <a className="rounded-lg border border-white/10 bg-white/5 px-3 py-2" href="/app/dashboard">Open Dashboard</a>
+          <Link className="rounded-lg border border-white/10 bg-white/5 px-3 py-2" href="/app/dashboard">Open Dashboard</Link>
         </div>
       </section>
     </div>
