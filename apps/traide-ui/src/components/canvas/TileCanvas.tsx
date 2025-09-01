@@ -1,5 +1,5 @@
 "use client"
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ContextMenu, MenuItem, MenuSep } from './ContextMenu'
 import { ComponentPalette } from './ComponentPalette'
 import { PANEL_REGISTRY, Tile, TileKind } from './types'
@@ -87,6 +87,10 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
   const [tiles, setTiles] = useState<Tile[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [cols, setCols] = useState<number>(1)
+  const canvasRef = useRef<HTMLDivElement | null>(null)
+  const [drag, setDrag] = useState<null | { id: string; dx: number; dy: number; w: number; h: number }>(null)
+  const [resize, setResize] = useState<null | { id: string; startX: number; startY: number; w: number; h: number }>(null)
+  const [snapFx, setSnapFx] = useState<null | { x: number; y: number; vertical: boolean }>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [layouts, setLayouts] = useState<Record<string, Tile[]>>({})
@@ -176,6 +180,15 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
     return () => mq.removeEventListener('change', apply)
   }, [])
 
+  const metrics = useMemo(() => {
+    const el = canvasRef.current
+    const w = el?.clientWidth || 1
+    const gap = 16 // matches gap-4
+    const colW = Math.max(1, (w - gap * (cols - 1)) / cols)
+    const rowH = 380
+    return { colW, rowH, gap }
+  }, [cols, canvasRef.current?.clientWidth])
+
   // basic collision check for target slot
   const occupied = useCallback((id: string, x: number, y: number, w: number, h: number) => {
     return tiles.some(t => t.id !== id && !(x + w <= t.x || t.x + t.w <= x || y + h <= t.y || t.y + t.h <= y))
@@ -203,27 +216,125 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
     setTiles(copy)
   }, [selectedId, tiles, cols, occupied])
 
+  // Drag handlers
+  const startDrag = useCallback((id: string, e: React.MouseEvent) => {
+    const el = canvasRef.current
+    if (!el) return
+    const rect = el.getBoundingClientRect()
+    const tile = tiles.find(t => t.id === id)
+    if (!tile) return
+    const px = e.clientX - rect.left
+    const py = e.clientY - rect.top
+    const { colW, rowH } = metrics
+    const dx = px - tile.x * (colW + metrics.gap)
+    const dy = py - tile.y * (rowH + metrics.gap)
+    setSelectedId(id)
+    setDrag({ id, dx, dy, w: tile.w, h: tile.h })
+  }, [tiles, metrics])
+
+  useEffect(() => {
+    if (!drag && !resize) return
+    const onMove = (e: MouseEvent) => {
+      e.preventDefault()
+      // trigger re-render via state toggles; actual preview computed in render
+      setDrag(d => (d ? { ...d } : d))
+      setResize(r => (r ? { ...r } : r))
+    }
+    const onUp = (e: MouseEvent) => {
+      if (drag) {
+        const el = canvasRef.current
+        if (el) {
+          const rect = el.getBoundingClientRect()
+          const px = e.clientX - rect.left
+          const py = e.clientY - rect.top
+          const { colW, rowH, gap } = metrics
+          const tile = tiles.find(t => t.id === drag.id)
+          if (tile) {
+            let gx = Math.max(0, Math.min(Math.max(0, cols - tile.w), Math.floor((px - drag.dx) / (colW + gap))))
+            let gy = Math.max(0, Math.floor((py - drag.dy) / (rowH + gap)))
+            while (occupied(tile.id, gx, gy, tile.w, tile.h)) gy++
+            const copy = tiles.map(t => t.id === tile.id ? { ...t, x: gx, y: gy } : t)
+            setTiles(copy)
+            // physics snap: brief bounce
+            requestAnimationFrame(() => {
+              const elTile = document.querySelector(`[data-tile-id="${tile.id}"]`) as HTMLElement | null
+              if (elTile) {
+                elTile.classList.remove('snap-bounce')
+                void elTile.offsetWidth
+                elTile.classList.add('snap-bounce')
+                setTimeout(() => elTile.classList.remove('snap-bounce'), 260)
+              }
+            })
+            // draw snap line if adjacent to any neighbor
+            const neighbor = tiles.find(t => t.id !== tile.id && (t.x === gx + tile.w && t.y <= gy + tile.h - 1 && gy <= t.y + t.h - 1))
+              || tiles.find(t => t.id !== tile.id && (t.y === gy + tile.h && t.x <= gx + tile.w - 1 && gx <= t.x + t.w - 1))
+            if (neighbor) {
+              const vertical = Boolean(neighbor.x === gx + tile.w)
+              setSnapFx({ x: vertical ? neighbor.x : gx, y: vertical ? Math.max(gy, neighbor.y) : neighbor.y, vertical })
+              setTimeout(() => setSnapFx(null), 220)
+            }
+          }
+        }
+      }
+      if (resize) {
+        const el = canvasRef.current
+        if (el) {
+          const rect = el.getBoundingClientRect()
+          const px = e.clientX - rect.left
+          const py = e.clientY - rect.top
+          const { colW, rowH, gap } = metrics
+          const tile = tiles.find(t => t.id === resize.id)
+          if (tile) {
+            let gw = Math.max(1, Math.min(cols - tile.x, Math.round((px - tile.x * (colW + gap)) / (colW + gap))))
+            let gh = Math.max(1, Math.round((py - tile.y * (rowH + gap)) / (rowH + gap)))
+            while (occupied(tile.id, tile.x, tile.y, gw, gh)) gh++
+            const copy = tiles.map(t => t.id === tile.id ? { ...t, w: gw, h: gh } : t)
+            setTiles(copy)
+          }
+        }
+      }
+      setDrag(null); setResize(null)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp, { once: true })
+    return () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp as any)
+    }
+  }, [drag, resize, tiles, cols, metrics, occupied])
+
   return (
     <div
       className="relative h-[calc(100vh-120px)] w-full select-none"
       onContextMenu={onContextMenu}
       tabIndex={0}
       onKeyDown={onKeyDown}
+      ref={canvasRef}
     >
       <div className="grid h-full grid-cols-1 gap-4 md:grid-cols-2" style={{ gridAutoRows: '380px' }}>
         {tiles.map(t => (
           <div
             key={t.id}
-            className={"min-h-[380px] outline-2 outline-offset-2 " + (selectedId === t.id ? 'outline-blue-400/70' : 'outline-transparent')}
+            data-tile-id={t.id}
+            className={"group relative min-h-[380px] outline-2 outline-offset-2 transition-transform " + (selectedId === t.id ? 'outline-blue-400/70' : 'outline-transparent')}
             style={{
               gridColumn: `${Math.min(t.x + 1, cols)} / span ${Math.min(t.w, cols)}`,
               gridRow: `${t.y + 1} / span ${Math.max(1, t.h)}`,
             }}
             onMouseDown={(e) => { e.stopPropagation(); setSelectedId(t.id) }}
           >
-            <TilePanel title={titleFor(t.kind)} onClose={() => closeTile(t.id)}>
+            <TilePanel title={titleFor(t.kind)} onClose={() => closeTile(t.id)} onDragStart={(e) => startDrag(t.id, e)}>
               {renderTileContent(t.kind, t.id)}
             </TilePanel>
+            {/* Resize handle (SE) */}
+            <div
+              className="absolute bottom-1 right-1 hidden h-3 w-3 cursor-nwse-resize rounded-sm bg-white/50 group-hover:block"
+              onMouseDown={(e) => {
+                e.stopPropagation(); e.preventDefault()
+                setResize({ id: t.id, startX: e.clientX, startY: e.clientY, w: t.w, h: t.h })
+                setSelectedId(t.id)
+              }}
+            />
           </div>
         ))}
         {tiles.length === 0 && (
@@ -277,6 +388,15 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
           )}
         </div>
       </div>
+
+      {snapFx && (() => {
+        const { colW, rowH, gap } = metrics
+        const left = snapFx.vertical ? (snapFx.x) * (colW + gap) - gap / 2 : 0
+        const top = snapFx.vertical ? snapFx.y * (rowH + gap) : (snapFx.y) * (rowH + gap) - gap / 2
+        const w = snapFx.vertical ? 2 : (cols * (colW + gap))
+        const h = snapFx.vertical ? (rowH) : 2
+        return <div className="pointer-events-none absolute z-20 rounded-full bg-sky-300/50 blur-[1px]" style={{ left, top, width: w, height: h }} />
+      })()}
     </div>
   )
 }
