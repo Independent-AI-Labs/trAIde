@@ -8,7 +8,7 @@ const tsRecommended = tseslint.configs.recommended.map((c) => ({ ...c, files: ['
 // Use non-type-checked recommended rules for broad compatibility
 
 export default [
-  { ignores: ['dist/**', 'coverage/**', 'node_modules/**', 'ta/**'] },
+  { ignores: ['dist/**', 'coverage/**', 'node_modules/**', 'ta/**', '.run/**', 'apps/**/.next/**'] },
   js.configs.recommended,
   ...tsRecommended,
   // No type-aware preset to avoid requiring project typing for all files

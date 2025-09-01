@@ -1,5 +1,6 @@
 "use client"
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { sseUrl } from '@/lib/mcp'
 
 export function StatusPill({ label, healthUrl = '/api/mcp/health', connected }: { label?: string; healthUrl?: string; connected?: boolean }) {
   const [latency, setLatency] = useState<number | null>(null)
@@ -11,7 +12,10 @@ export function StatusPill({ label, healthUrl = '/api/mcp/health', connected }: 
     async function ping() {
       const t0 = performance.now()
       try {
-        const r = await fetch(healthUrl, { cache: 'no-cache' })
+        const target = healthUrl && healthUrl.startsWith('/api/mcp')
+          ? sseUrl(healthUrl.replace(/^\/api\/mcp/, ''))
+          : healthUrl
+        const r = await fetch(target, { cache: 'no-cache' })
         const t1 = performance.now()
         if (!mounted) return
         setLatency(Math.round(t1 - t0))
@@ -55,4 +59,3 @@ function statusColorClass(status: string) {
       return 'text-white/80'
   }
 }
-
