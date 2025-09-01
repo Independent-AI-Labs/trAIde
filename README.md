@@ -32,6 +32,12 @@ Operate (at a glance)
 - Open the UI and, if needed, set your MCP URL via the top‑right “Endpoint” pill; UI talks to MCP through `/api/mcp/*`.
 - For containerized runs, build with the provided Dockerfiles and use the compose file.
 
+Docker quickstart
+- Build and run both services: `docker compose up --build`
+- UI: `http://localhost:62008` (env `NEXT_PUBLIC_MCP_BASE_URL` points to MCP)
+- MCP: `http://localhost:62007` with `/health`, `/klines`, `/stream/klines`
+- CORS: allow all by default in compose; adjust `MCP_CORS_ORIGINS` as needed.
+
 System view
 
 ```mermaid

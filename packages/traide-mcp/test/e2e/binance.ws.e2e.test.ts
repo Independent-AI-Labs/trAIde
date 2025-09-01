@@ -1,10 +1,14 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
 
-let hasWs = true;
-try { await import('ws'); } catch { hasWs = false; }
+// Opt-in WS E2E to avoid flakiness and CI/network constraints
+const enabled = process.env.BINANCE_WS_E2E === '1';
+let hasWs = enabled;
+if (enabled) {
+  try { await import('ws'); } catch { hasWs = false; }
+}
 
-(hasWs ? describe : describe.skip)('Binance WS E2E', () => {
+(enabled && hasWs ? describe : describe.skip)('Binance WS E2E', () => {
   it('receives kline events', async () => {
     const { BinanceProvider } = await import('../../src/providers/binance');
     const provider = new BinanceProvider(

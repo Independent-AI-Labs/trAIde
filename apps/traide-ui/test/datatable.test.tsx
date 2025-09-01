@@ -21,6 +21,8 @@ describe('DataTable', () => {
       { key: 'n', label: 'N', align: 'right' },
     ]
     const { container } = render(<DataTable rows={rows} columns={cols} defaultSort={{ key: 'a', desc: false }} />)
+    // wait for initial render to commit
+    await new Promise((r) => setTimeout(r, 0))
     const headers = Array.from(container.querySelectorAll('th button')) as HTMLButtonElement[]
     // Click on N header to sort by number desc
     headers[1]!.click()
@@ -29,4 +31,3 @@ describe('DataTable', () => {
     expect(firstRowCells[1]!.textContent).toContain('2')
   })
 })
-

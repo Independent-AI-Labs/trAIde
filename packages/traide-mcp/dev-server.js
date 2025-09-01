@@ -1,10 +1,10 @@
-// Minimal HTTP + SSE server for live klines using Binance WS
-import http from 'http'
-import { WebSocket } from 'ws'
+// Minimal HTTP + SSE server for live klines using Binance WS (CommonJS)
+const http = require('http')
+const { WebSocket } = require('ws')
 
 const BINANCE_REST = process.env.BINANCE_REST_URL || 'https://api.binance.com/api/v3'
 
-const PORT = Number(process.env.PORT || 8080)
+const PORT = Number(process.env.PORT || 62007)
 const CORS = (process.env.MCP_CORS_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean)
 
 function allowOrigin(origin) {

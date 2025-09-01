@@ -1,7 +1,13 @@
-import { defineConfig } from 'vitest/config';
+import { defineConfig, configDefaults } from 'vitest/config';
 
 export default defineConfig({
   test: {
+    exclude: [
+      ...configDefaults.exclude,
+      // Run UI tests with their own jsdom config via `npm run ui:test`
+      'apps/traide-ui/test/**/*.*',
+      'node_modules/@traide/ui/**/*.*',
+    ],
     server: { deps: { external: ['ws'] } },
     deps: { optimizer: { ssr: { exclude: ['ws'] } } },
     globals: false,
