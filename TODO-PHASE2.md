@@ -19,6 +19,7 @@ Scope: everything left to implement or harden across core (indicators), MCP serv
 - Stores & hooks: Zustand stores; `useSymbols`, `useKlines`, `useIndicators`, `useStream`, `useCombinedSeries`, `useUrlState`.
 - Scanner: rule builder (indicator comparators), batch + incremental modes; virtualized results.
 - Playground: client compute vs MCP parity view; CSV export; parity badge.
+- Panel groups/containers: allow Watchlist/Playground/etc. to act as generic containers that can host other components; drag to group/ungroup; move between containers; context actions “Group into Panel…”, “Move to…”, “Ungroup all”. Smooth animations and drop targets.
 - UX: StreamStatusBar, LatencyMeter, toasts, error/empty/loading states; theme toggle.
 - Analytics & monitoring: Plausible/PostHog, Sentry, basic performance beacons.
 - SEO & marketing: metadata/OG, sitemap/robots, portfolio cards, badges.
@@ -80,4 +81,3 @@ Scope: everything left to implement or harden across core (indicators), MCP serv
 ---
 
 Note: Remove or update README links that referenced the old TODO/SPEC documents to point to this file and the docs site once available.
-

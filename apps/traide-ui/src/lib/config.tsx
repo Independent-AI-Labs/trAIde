@@ -54,36 +54,34 @@ export function MCPConfigProvider({ children }: { children: React.ReactNode }) {
     const val = normalized || def
     setBaseUrlState(val)
     try { document.cookie = `mcp=${encodeURIComponent(val)}; path=/; max-age=${60 * 60 * 24 * 365}` } catch {}
-    // Probe /health; if 404/failed, try fallbacks (:62007, :65000, :8787)
+    // Probe via same-origin proxy to avoid browser CORS/noise; try sensible fallbacks only
     ;(async () => {
-      try {
-        const resp = await fetch(val.replace(/\/$/, '') + '/health', { mode: 'cors' })
-        if (!resp.ok) throw new Error('bad_status')
-        const j = await resp.json().catch(() => ({}))
-        if (j && j.status === 'ok') return
-      } catch {
-        const candidates: string[] = []
+      async function okFor(candidate: string) {
         try {
-          const loc = new URL(window.location.origin)
-          candidates.push(`${loc.protocol}//${loc.hostname}:62007`)
-          candidates.push(`${loc.protocol}//${loc.hostname}:65000`)
-          candidates.push(`${loc.protocol}//${loc.hostname}:8787`)
-        } catch {}
-        // Fallbacks commonly used in local/dev LANs
-        candidates.push('http://localhost:62007')
-        // Avoid pinning to specific IP unless provided via ?mcp or Settings
-        for (const c of candidates) {
+          document.cookie = `mcp=${encodeURIComponent(candidate.replace(/\/$/, ''))}; path=/; max-age=${60 * 60 * 24 * 365}`
+          const resp = await fetch('/api/mcp/health', { cache: 'no-store' })
+          if (!resp.ok) return false
+          const j = await resp.json().catch(() => null)
+          return Boolean(j && (j.status === 'ok' || j.provider))
+        } catch {
+          return false
+        }
+      }
+      if (await okFor(val)) return
+      const candidates: string[] = []
+      try {
+        const loc = new URL(window.location.origin)
+        candidates.push(`${loc.protocol}//${loc.hostname}:62007`)
+      } catch {}
+      candidates.push('http://localhost:62007')
+      for (const c of candidates) {
+        if (await okFor(c)) {
+          setBaseUrlState(c)
           try {
-            const r = await fetch(c.replace(/\/$/, '') + '/health', { mode: 'cors' })
-            if (r.ok) {
-              setBaseUrlState(c)
-              try {
-                localStorage.setItem(KEY, c)
-                document.cookie = `mcp=${encodeURIComponent(c)}; path=/; max-age=${60 * 60 * 24 * 365}`
-              } catch {}
-              return
-            }
+            localStorage.setItem(KEY, c)
+            document.cookie = `mcp=${encodeURIComponent(c)}; path=/; max-age=${60 * 60 * 24 * 365}`
           } catch {}
+          return
         }
       }
     })()

@@ -31,6 +31,18 @@ Deliverables
 - Layout store (Zustand): `{ tiles[], selectedTileId, layouts[] }` with undo/redo.
 - Layout serialization format with versioning.
 
+Panel Groups & Containers (New)
+- Generic container panels (e.g., Watchlist, Playground) can host other components as children.
+- Drag to group: drop a tile onto a container to nest it; visual drop indicators and smooth animation.
+- Move between containers: context action “Move to…”, plus drag‑out to ungroup.
+- Group via menu: multi‑select tiles → “Group into Panel…”.
+- Container toolbar exposes “Ungroup all”, “Rename”, and quick layout presets for child arrangement.
+
+Acceptance Criteria
+- Nesting/ungrouping is fluid with clear affordances; no layout thrash.
+- Moving tiles between containers preserves panel state and sizes.
+- Keyboard support: multi‑select + group/ungroup via shortcuts.
+
 Acceptance Criteria
 - Drag, reorder, resize with snap and visual previews.
 - Panel header with title/actions; collapse/expand; close restores layout gracefully.

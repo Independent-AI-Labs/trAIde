@@ -25,10 +25,8 @@ export function getMcpBaseUrlClient(): string | undefined {
 // Build an SSE-friendly URL: if a base URL is configured, return absolute URL
 // to offload connections from Next.js origin; otherwise, proxy via /api/mcp.
 export function sseUrl(pathAndQuery: string): string {
-  const base = getMcpBaseUrlClient()
+  // Route through same-origin proxy to avoid browser CORS issues in dev/LAN
   const path = pathAndQuery.startsWith('/') ? pathAndQuery : `/${pathAndQuery}`
-  if (base) return `${base.replace(/\/$/, '')}${path}`
-  // Fallback to same-origin proxy
   return `/api/mcp${path}`
 }
 

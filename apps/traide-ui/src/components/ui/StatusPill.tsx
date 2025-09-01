@@ -12,9 +12,10 @@ export function StatusPill({ label, healthUrl = '/api/mcp/health', connected }: 
     async function ping() {
       const t0 = performance.now()
       try {
+        // Prefer same-origin proxy when using /api/mcp to avoid CORS in browsers
         const target = healthUrl && healthUrl.startsWith('/api/mcp')
-          ? sseUrl(healthUrl.replace(/^\/api\/mcp/, ''))
-          : healthUrl
+          ? healthUrl
+          : sseUrl(healthUrl)
         const r = await fetch(target, { cache: 'no-cache' })
         const t1 = performance.now()
         if (!mounted) return

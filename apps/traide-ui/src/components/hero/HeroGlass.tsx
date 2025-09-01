@@ -12,7 +12,7 @@ export function HeroGlass() {
             Live streaming indicators, blazing performance, and a glassmorphic interface that feels tangible. Built on the trAIde MCP.
           </p>
           <div className="mt-8 flex flex-wrap gap-4">
-            <Link href="/app/chart/BTCUSDT" className="contents"><GlassButton>Launch App</GlassButton></Link>
+            <Link href="/app/dashboard" className="contents"><GlassButton>Launch App</GlassButton></Link>
             <a href="https://github.com/Independent-AI-Labs/trAIde" target="_blank" className="contents"><GlassButton className="bg-white/5">View GitHub</GlassButton></a>
           </div>
         </div>
