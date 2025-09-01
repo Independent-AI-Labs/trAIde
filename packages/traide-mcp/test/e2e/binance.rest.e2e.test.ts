@@ -1,11 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { BinanceProvider } from '../../src/providers/binance';
+
+// Opt-in to avoid CI/network flakiness (451/geo or rate limits)
+const enabled = process.env.BINANCE_REST_E2E === '1';
+
 const provider = new BinanceProvider(
   process.env.BINANCE_REST_URL ?? 'https://api.binance.com',
   process.env.BINANCE_WS_URL ?? 'wss://stream.binance.com/ws',
 );
 
-describe('Binance REST E2E', () => {
+(enabled ? describe : describe.skip)('Binance REST E2E', () => {
   it('lists trading symbols', async () => {
     const symbols = await provider.getSymbols();
     expect(Array.isArray(symbols)).toBe(true);
