@@ -62,11 +62,31 @@ function titleFor(kind: TileKind): string {
 function nextId() { return Math.random().toString(36).slice(2, 9) }
 
 const LS_KEY = 'traide.tiles.v1'
+const LS_LAYOUTS = 'traide.layouts.v1'
+
+function loadLayouts(): Record<string, Tile[]> {
+  if (typeof window === 'undefined') return {}
+  try {
+    const raw = window.localStorage.getItem(LS_LAYOUTS)
+    if (!raw) return {}
+    const parsed = JSON.parse(raw)
+    if (parsed && typeof parsed === 'object') return parsed as Record<string, Tile[]>
+  } catch {}
+  return {}
+}
+
+function saveLayouts(obj: Record<string, Tile[]>) {
+  if (typeof window === 'undefined') return
+  try { window.localStorage.setItem(LS_LAYOUTS, JSON.stringify(obj)) } catch {}
+}
 
 export function TileCanvas() {
   const [tiles, setTiles] = useState<Tile[]>([])
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [layouts, setLayouts] = useState<Record<string, Tile[]>>({})
+  const [savingName, setSavingName] = useState('')
+  const [layoutOpen, setLayoutOpen] = useState(false)
   const onContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault(); setMenu({ x: e.clientX, y: e.clientY })
   }, [])
@@ -84,6 +104,7 @@ export function TileCanvas() {
   // Load persisted layout on mount
   useEffect(() => {
     if (typeof window === 'undefined') return
+    setLayouts(loadLayouts())
     try {
       const raw = window.localStorage.getItem(LS_KEY)
       if (!raw) return
@@ -100,6 +121,25 @@ export function TileCanvas() {
     if (typeof window === 'undefined') return
     try { window.localStorage.setItem(LS_KEY, JSON.stringify(tiles)) } catch {}
   }, [tiles])
+
+  // Layout actions
+  const saveCurrentAs = useCallback((name: string) => {
+    const n = name.trim()
+    if (!n) return
+    const next = { ...layouts, [n]: tiles }
+    setLayouts(next)
+    saveLayouts(next)
+  }, [layouts, tiles])
+  const loadLayout = useCallback((name: string) => {
+    const t = layouts[name]
+    if (t && Array.isArray(t)) setTiles(t)
+  }, [layouts])
+  const deleteLayout = useCallback((name: string) => {
+    const next = { ...layouts }
+    delete next[name]
+    setLayouts(next)
+    saveLayouts(next)
+  }, [layouts])
   return (
     <div className="relative h-[calc(100vh-120px)] w-full select-none" onContextMenu={onContextMenu}>
       <div className="grid h-full grid-cols-1 gap-4 md:grid-cols-2">
@@ -125,6 +165,33 @@ export function TileCanvas() {
         </ContextMenu>
       )}
       <ComponentPalette items={PANEL_REGISTRY} open={paletteOpen} onClose={() => setPaletteOpen(false)} onSelect={addTile} />
+
+      {/* Layout quick menu */}
+      <div className="pointer-events-none absolute left-3 top-3 z-20">
+        <div className="pointer-events-auto inline-flex gap-2 rounded-xl border border-white/10 bg-white/10 p-2 backdrop-blur">
+          <button className="rounded-lg bg-white/10 px-2 py-1 text-xs text-white/80 hover:bg-white/15" onClick={() => setLayoutOpen(v => !v)}>
+            Layouts
+          </button>
+          {layoutOpen && (
+            <div className="absolute mt-10 w-64 rounded-xl border border-white/10 bg-base-900/95 p-3 text-sm text-white/80 shadow-depth">
+              <div className="mb-2 text-xs uppercase tracking-wide text-white/60">Saved Layouts</div>
+              <div className="max-h-48 space-y-1 overflow-auto">
+                {Object.keys(layouts).length === 0 && <div className="text-white/50">No saved layouts</div>}
+                {Object.entries(layouts).map(([name]) => (
+                  <div key={name} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 hover:bg-white/10">
+                    <button className="truncate" onClick={() => { loadLayout(name); setLayoutOpen(false) }}>{name}</button>
+                    <button className="text-white/50 hover:text-rose-300" onClick={() => deleteLayout(name)}>Delete</button>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                <input className="w-full rounded-lg border border-white/20 bg-base-800/80 px-2 py-1 text-xs text-white placeholder-white/50 outline-none focus:border-white/40 focus:ring-1 focus:ring-white/20" placeholder="Save as…" value={savingName} onChange={(e) => setSavingName(e.target.value)} />
+                <button className="rounded-lg bg-white/10 px-2 py-1 text-xs hover:bg-white/15" onClick={() => { saveCurrentAs(savingName); setSavingName('') }}>Save</button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
