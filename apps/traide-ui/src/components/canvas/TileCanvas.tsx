@@ -1,5 +1,5 @@
 "use client"
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ContextMenu, MenuItem, MenuSep } from './ContextMenu'
 import { ComponentPalette } from './ComponentPalette'
 import { PANEL_REGISTRY, Tile, TileKind } from './types'
@@ -61,6 +61,8 @@ function titleFor(kind: TileKind): string {
 
 function nextId() { return Math.random().toString(36).slice(2, 9) }
 
+const LS_KEY = 'traide.tiles.v1'
+
 export function TileCanvas() {
   const [tiles, setTiles] = useState<Tile[]>([])
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
@@ -78,6 +80,26 @@ export function TileCanvas() {
     setTiles(prev => [...prev, { id, kind, x: col, y: row, w: 1, h: 1 }])
   }, [tiles])
   const closeTile = (id: string) => setTiles(prev => prev.filter(t => t.id !== id))
+
+  // Load persisted layout on mount
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const raw = window.localStorage.getItem(LS_KEY)
+      if (!raw) return
+      const parsed = JSON.parse(raw)
+      if (Array.isArray(parsed)) {
+        const sane = parsed.filter((p) => p && typeof p.id === 'string' && typeof p.kind === 'string')
+        if (sane.length) setTiles(sane as Tile[])
+      }
+    } catch {}
+  }, [])
+
+  // Persist layout on change
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try { window.localStorage.setItem(LS_KEY, JSON.stringify(tiles)) } catch {}
+  }, [tiles])
   return (
     <div className="relative h-[calc(100vh-120px)] w-full select-none" onContextMenu={onContextMenu}>
       <div className="grid h-full grid-cols-1 gap-4 md:grid-cols-2">
@@ -106,4 +128,3 @@ export function TileCanvas() {
     </div>
   )
 }
-
