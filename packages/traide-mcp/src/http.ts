@@ -162,7 +162,6 @@ export function startHttpServer(provider: MarketDataProvider) {
   });
 
   const port = cfg.port;
-  server.listen(port, () => logger.info(`HTTP listening on :${port}`));
+  server.listen(port, '0.0.0.0', () => logger.info(`HTTP listening on :${port}`));
   return server;
 }
-

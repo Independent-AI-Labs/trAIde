@@ -55,10 +55,10 @@ export function createMcpServer(provider: MarketDataProvider) {
     name: 'stream_klines',
     description: 'Stream klines and optional incremental indicators',
     inputSchema: { type: 'object', properties: {}, additionalProperties: true },
-    handler: async (input: StreamKlinesRequest, { emit }) => {
+    handler: async (input: StreamKlinesRequest, ctx: { emit: (data: any) => void }) => {
+      const { emit } = ctx
       logger.info('stream_klines subscribe', { input });
       validateStreamRequest(input);
-      return async () => {
       const wants = input.indicators ?? {};
       const calc = {
         macd: wants.macd ? new core.calculators.MacdCalc(wants.macd.slow ?? 26, wants.macd.fast ?? 12, wants.macd.signal ?? 9) : null,
@@ -114,9 +114,6 @@ export function createMcpServer(provider: MarketDataProvider) {
         },
       );
       return async () => {
-        unsubscribe();
-        logger.info('stream_klines unsubscribe', { input });
-      };
         unsubscribe();
         logger.info('stream_klines unsubscribe', { input });
       };

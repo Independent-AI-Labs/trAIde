@@ -5,19 +5,18 @@ services:
       context: .
       dockerfile: packages/traide-mcp/Dockerfile
     environment:
-      - PORT=65000
+      - PORT=62007
       - MCP_CORS_ORIGINS=*
     ports:
-      - "65000:65000"
+      - "62007:62007"
   ui:
     build:
       context: .
       dockerfile: apps/traide-ui/Dockerfile
     environment:
-      - NEXT_PUBLIC_MCP_BASE_URL=http://mcp:65000
-      - PORT=65001
+      - NEXT_PUBLIC_MCP_BASE_URL=http://mcp:62007
+      - PORT=62008
     ports:
-      - "65001:65001"
+      - "62008:62008"
     depends_on:
       - mcp
-

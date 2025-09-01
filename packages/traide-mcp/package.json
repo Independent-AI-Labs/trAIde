@@ -8,11 +8,13 @@
   "module": "dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.http.json",
     "start": "node dist/index.js",
     "dev": "node --loader ts-node/esm src/index.ts",
     "dev:http": "node --loader ts-node/esm src/dev-http.ts",
+    "dev:watch": "nodemon --watch src --ext ts,js,json --exec \"node --loader ts-node/esm src/dev-http.ts\"",
     "serve:mini": "node dev-server.js",
+    "serve:mini:watch": "nodemon --watch dev-server.js dev-server.js",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
@@ -22,6 +24,7 @@
   "devDependencies": {
     "@types/node": "^20.12.12",
     "typescript": "^5.5.0",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "nodemon": "^3.1.0"
   }
 }

@@ -85,7 +85,9 @@ export class BinanceProvider implements MarketDataProvider {
       if (!active) return;
       const url = `${this.wsUrl}/${stream}`;
       (async () => {
-        const mod: any = await import('ws');
+        // dynamic import via function to avoid TS resolution of 'ws' types
+        // eslint-disable-next-line @typescript-eslint/no-implied-eval
+        const mod: any = await (new Function('m', 'return import(m)'))('ws');
         const WS = mod?.default ?? mod?.WebSocket ?? mod;
         const ws = new WS(url);
         current = ws;
@@ -94,7 +96,7 @@ export class BinanceProvider implements MarketDataProvider {
         onEvent({ type: 'status', generatedAt: Date.now(), symbol, interval });
         logger.info('Binance WS open', { stream });
       });
-      ws.on('message', (data) => {
+      ws.on('message', (data: any) => {
         try {
           const msg = JSON.parse(data.toString());
           const k = msg?.k;

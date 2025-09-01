@@ -79,15 +79,7 @@ export function ScannerPanel() {
         <label className="ml-2 text-white/70">Min Vol
           <input type="number" className="ml-2 w-28 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs text-white/90 outline-none" value={minVol} onChange={(e) => setMinVol(Number(e.target.value || 0))} />
         </label>
-        <label className="ml-2 text-white/70">Sort
-          <select className="ml-2 rounded-xl border border-white/15 bg-white/5 px-2 py-1 text-xs text-white/90 outline-none" value={sortBy} onChange={(e) => setSortBy(e.target.value as keyof Row)}>
-            <option value="changePct" className="bg-neutral-900">Change %</option>
-            <option value="rangePct" className="bg-neutral-900">Range %</option>
-            <option value="vol" className="bg-neutral-900">Volume</option>
-            <option value="slope" className="bg-neutral-900">Trend</option>
-          </select>
-          <button className="ml-2 rounded-lg border border-white/10 bg-white/5 px-2 py-1" onClick={() => setDesc((d) => !d)}>{desc ? 'Desc' : 'Asc'}</button>
-        </label>
+        {/** External sort controls removed; DataTable header handles sorting */}
       </div>
 
       {loading ? (

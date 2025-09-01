@@ -1,36 +1,70 @@
 # trAIde MCP Server — Technical Notes
 
-The Model Context Protocol (MCP) server exposes trAIde’s indicators and market data as structured tools for AI agents and services.
+The MCP server exposes trAIde’s indicators and market data via two surfaces:
+- MCP stdio tools for agents.
+- HTTP + SSE for UIs and services.
 
-## Goals
-- Expose historical computations and live streams via typed tools
-- Provide stable schemas for candles, indicators, and signals
-- Support low‑latency incremental updates for live trading contexts
+It implements validation, basic rate‑limiting, structured logs, and Prometheus‑style metrics.
 
-## Core Tools (proposed)
-- `compute_indicators`:
-  - Input: `{ symbol, interval, start?, end?, windows: { macd?: {...}, rsi?: {...}, ... } }`
-  - Output: `{ candles, series: { macd, signal, diff, rsi, ... } }`
-- `stream_klines`:
-  - Input: `{ symbol, interval }`
-  - Output: streaming events `{ candle, indicators? }` (opt‑in incremental compute)
-- `list_symbols`:
-  - Output: `{ symbols: string[] }`
+## Environment
+- `PORT` (default `8080` for dev, compose maps to `65000`)
+- `MCP_ENABLE_HTTP` (`true`/`false`, default `true`)
+- `MCP_ENABLE_SSE` (`true`/`false`, default `true`)
+- `MCP_ENABLE_WS` (`true`/`false`, default `false`)
+- `MCP_HTTP_TOKEN` (optional bearer token for HTTP)
+- `MCP_CORS_ORIGINS` (CSV list or `*`)
+- `BINANCE_REST_URL` (default `https://api.binance.com`)
+- `BINANCE_WS_URL` (default `wss://stream.binance.com/ws`)
+- Backoff/heartbeat: `MCP_WS_REPLAY_CANDLES`, `MCP_BACKOFF_BASE_MS`, `MCP_BACKOFF_MAX_MS`, `MCP_HEARTBEAT_MS`
 
-## Data Sources
-- Binance REST: `GET /api/v3/klines` for historical candles
-- Binance WS: `wss://stream.binance.com/ws/{symbol}@kline_{interval}` for live updates
+## HTTP API
 
-## Schemas (sketch)
-- Candle: `{ t:number, o:number, h:number, l:number, c:number, v:number }`
-- Series: arrays aligned to candle indices, `NaN` for warm‑ups
-- Errors: typed codes + messages; partial results permitted
+Base URL depends on deployment (e.g., `http://localhost:65000`). The UI proxies requests via Next at `/api/mcp/*` and can override the base URL using a `mcp` cookie or `NEXT_PUBLIC_MCP_BASE_URL`.
 
-## Incremental Compute
-- Maintain per‑symbol state for streaming calculators (EMA/RSI/MACD/ATR/Stoch/VWAP)
-- On each kline close, update calculators and publish deltas
+- `GET /health`
+  - 200 `{ status:'ok', uptime:number, version:string, provider:'binance' }`
 
-## Security & Ops
-- Rate limiting/throttling; configurable concurrency
-- Health endpoints and basic telemetry
-- Deployment: Node server or serverless functions
+- `GET /symbols`
+  - 200 `{ symbols: string[], updatedAt: number }`
+
+- `GET /klines?symbol=BTCUSDT&interval=1m&start=...&end=...&limit=...`
+  - 200 `{ candles: Candle[] }`
+  - 400 `{ error: { code:'missing_params', message:string } }`
+
+- `POST /indicators`
+  - Body: `ComputeIndicatorsRequest`
+  - 200 `ComputeIndicatorsResponse`
+  - 400 `{ error: { code:'invalid_compute_request' | 'invalid_*', ... } }`
+
+- `GET /stream/klines?symbol=BTCUSDT&interval=1m&indicators=rsi,ppo,macd`
+  - SSE stream; each event is a `KlineEvent`.
+  - When `indicators` are provided, events include `deltas` (incremental values) with keys: `macd`, `signal`, `diff`, `rsi`, `atr`, `stoch_k`, `stoch_d`, `vwap`, `ppo`, `ppo_signal`, `ppo_hist`, `pvo`, `pvo_signal`, `pvo_hist`.
+
+- `GET /metrics`
+  - Prometheus‑style metrics for HTTP and MCP tools.
+
+Auth: if `MCP_HTTP_TOKEN` is set, HTTP requests must include `Authorization: Bearer <token>`.
+
+CORS: allowed origins controlled by `MCP_CORS_ORIGINS` (CSV or `*`).
+
+Rate limiting: IP‑based, 30 burst with ~15 rps refill.
+
+Types: see `packages/traide-mcp/src/types.ts` for `Candle`, `ComputeIndicatorsRequest/Response`, `KlineEvent`.
+
+## MCP Tools (stdio)
+
+- `health`: returns server status and uptime.
+- `list_symbols`: fetches available market symbols.
+- `compute_indicators`: validates request, fetches klines, returns series per requested windows.
+- `stream_klines`: subscribes to live klines and optionally computes incremental indicator deltas.
+
+## Provider
+
+Current provider: Binance.
+- REST: `/api/v3/klines` pagination for history.
+- WS: `${symbol}@kline_${interval}` for live candles.
+- Resilience: exponential backoff, heartbeat events, and “replay recent” on reconnect to reduce gaps.
+
+## Error Handling
+
+Errors are mapped to JSON with stable codes where possible, e.g. `missing_params`, `invalid_compute_request`, and a structured `error` message for internal failures.

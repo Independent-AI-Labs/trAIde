@@ -26,8 +26,8 @@ function isLocalhostUrl(v: string) {
 }
 
 function defaultBaseUrl() {
-  // VM default requested
-  return 'http://172.72.72.2:8080'
+  // Default MCP endpoint (local)
+  return 'http://localhost:62007'
 }
 
 type Ctx = {
@@ -50,19 +50,26 @@ export function MCPConfigProvider({ children }: { children: React.ReactNode }) {
     if (qp) {
       const val = normalizeBaseUrl(qp)
       setBaseUrlState(val)
-      try { localStorage.setItem(KEY, val) } catch {}
+      try {
+        localStorage.setItem(KEY, val)
+        document.cookie = `mcp=${encodeURIComponent(val)}; path=/; max-age=${60 * 60 * 24 * 365}`
+      } catch {}
       return
     }
     // Migrate away from localhost-stuck values
     const normalized = normalizeBaseUrl(ls || '')
     if (normalized && isLocalhostUrl(normalized)) {
       setBaseUrlState(def)
-      try { localStorage.setItem(KEY, def) } catch {}
+      try {
+        localStorage.setItem(KEY, def)
+        document.cookie = `mcp=${encodeURIComponent(def)}; path=/; max-age=${60 * 60 * 24 * 365}`
+      } catch {}
       // continue to probe
     }
     const val = normalized || def
     setBaseUrlState(val)
-    // Probe /health; if 404/failed, try fallbacks (:65000, :8787)
+    try { document.cookie = `mcp=${encodeURIComponent(val)}; path=/; max-age=${60 * 60 * 24 * 365}` } catch {}
+    // Probe /health; if 404/failed, try fallbacks (:62007, :65000, :8787)
     ;(async () => {
       try {
         const resp = await fetch(val.replace(/\/$/, '') + '/health', { mode: 'cors' })
@@ -73,9 +80,12 @@ export function MCPConfigProvider({ children }: { children: React.ReactNode }) {
         const candidates: string[] = []
         try {
           const loc = new URL(window.location.origin)
+          candidates.push(`${loc.protocol}//${loc.hostname}:62007`)
           candidates.push(`${loc.protocol}//${loc.hostname}:65000`)
           candidates.push(`${loc.protocol}//${loc.hostname}:8787`)
         } catch {}
+        candidates.push('http://localhost:62007')
+        candidates.push('http://172.72.72.2:62007')
         candidates.push('http://172.72.72.2:65000')
         candidates.push('http://172.72.72.2:8787')
         for (const c of candidates) {
@@ -83,7 +93,10 @@ export function MCPConfigProvider({ children }: { children: React.ReactNode }) {
             const r = await fetch(c.replace(/\/$/, '') + '/health', { mode: 'cors' })
             if (r.ok) {
               setBaseUrlState(c)
-              try { localStorage.setItem(KEY, c) } catch {}
+              try {
+                localStorage.setItem(KEY, c)
+                document.cookie = `mcp=${encodeURIComponent(c)}; path=/; max-age=${60 * 60 * 24 * 365}`
+              } catch {}
               return
             }
           } catch {}

@@ -10,7 +10,7 @@ const TTL_MS = 10_000
 function targetBase() {
   const c = cookies().get('mcp')?.value
   const env = process.env.NEXT_PUBLIC_MCP_BASE_URL
-  return (c && decodeURIComponent(c)) || env || 'http://localhost:65000'
+  return env || (c && decodeURIComponent(c)) || 'http://localhost:62007'
 }
 
 function buildTargetUrl(req: NextRequest) {
@@ -47,6 +47,7 @@ async function proxy(req: NextRequest, init?: RequestInit) {
         'content-type': 'text/event-stream',
         'cache-control': 'no-cache',
         'connection': 'keep-alive',
+        'x-proxy-target': url,
       },
     })
   }
@@ -55,7 +56,7 @@ async function proxy(req: NextRequest, init?: RequestInit) {
   if (isKlines && res.ok) {
     cache.set(url, { body: bodyBuf, ct, exp: Date.now() + TTL_MS })
   }
-  return new Response(bodyBuf, { status: res.status, headers: { 'content-type': ct || 'application/json' } })
+  return new Response(bodyBuf, { status: res.status, headers: { 'content-type': ct || 'application/json', 'x-proxy-target': url } })
 }
 
 export async function GET(req: NextRequest) { return proxy(req) }

@@ -88,7 +88,7 @@ function openBrowser(url) {
   try { spawn(cmd, args, { stdio: 'ignore', detached: true }).unref() } catch {}
 }
 
-async function startUI({ prod = false, port = 3333, baseUrl, envKVs = [], open = false, force = true, envFile } = {}) {
+async function startUI({ prod = false, port = 62008, baseUrl, envKVs = [], open = false, force = true, envFile } = {}) {
   if (!fs.existsSync(APP_DIR)) {
     console.error('Error: apps/traide-ui not found. Run from repo root.')
     process.exit(1)
@@ -106,6 +106,8 @@ async function startUI({ prod = false, port = 3333, baseUrl, envKVs = [], open =
   const env = { ...process.env }
   if (envFile) Object.assign(env, loadEnvFile(envFile))
   if (baseUrl) env.NEXT_PUBLIC_MCP_BASE_URL = baseUrl
+  // Ensure Next binds to the requested port and all interfaces
+  env.PORT = String(port)
   for (const kv of envKVs) {
     const idx = kv.indexOf('=')
     if (idx > 0) env[kv.slice(0, idx)] = kv.slice(idx + 1)
@@ -129,10 +131,10 @@ async function startUI({ prod = false, port = 3333, baseUrl, envKVs = [], open =
       b.on('exit', (code) => (code === 0 ? resolve() : reject(new Error('build_failed'))))
     })
     console.log('Starting UI (prod)...')
-    args.push('run', 'start', '--', '-p', String(port))
+    args.push('run', 'start', '--', '-p', String(port), '-H', '0.0.0.0')
   } else {
     console.log('Starting UI (dev)...')
-    args.push('run', 'dev', '--', '-p', String(port))
+    args.push('run', 'dev', '--', '-p', String(port), '-H', '0.0.0.0')
   }
 
   const child = spawn(npmCmd, args, {
@@ -208,7 +210,7 @@ function logsUI({ follow = false, lines = 200 } = {}) {
   }
 }
 
-async function startMCP({ port = 8787, corsOrigin, mini = true, force = true, envFile } = {}) {
+async function startMCP({ port = 62007, corsOrigin, mini = true, force = true, envFile, prod = false } = {}) {
   if (!fs.existsSync(MCP_DIR)) {
     console.error('Error: packages/traide-mcp not found. Run from repo root.')
     process.exit(1)
@@ -228,13 +230,34 @@ async function startMCP({ port = 8787, corsOrigin, mini = true, force = true, en
   if (corsOrigin) env.MCP_CORS_ORIGINS = corsOrigin
 
   let cmd, args
-  if (mini) {
+  const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
+  let useWatch = Boolean(process.env.TRAIDE_WATCH || (globalThis.__runnerWatchFlag === true))
+  const nodemonBin = (() => {
+    const exe = process.platform === 'win32' ? 'nodemon.cmd' : 'nodemon'
+    const local = path.join(MCP_DIR, 'node_modules', '.bin', exe)
+    const root = path.join(ROOT, 'node_modules', '.bin', exe)
+    if (fs.existsSync(local)) return local
+    if (fs.existsSync(root)) return root
+    return null
+  })()
+  if (useWatch && !nodemonBin) {
+    console.warn('[runner] nodemon not found; falling back to non-watch mode for MCP')
+    useWatch = false
+  }
+  if (prod) {
+    console.log('Building MCP (prod)...')
+    await new Promise((resolve, reject) => {
+      const b = spawn(npmCmd, ['run', 'build'], { cwd: MCP_DIR, env, stdio: 'inherit' })
+      b.on('exit', (code) => (code === 0 ? resolve() : reject(new Error('mcp_build_failed'))))
+    })
     cmd = process.platform === 'win32' ? 'node.exe' : 'node'
-    args = ['dev-server.js']
+    args = ['dist/dev-http.js']
+  } else if (mini) {
+    if (useWatch && nodemonBin) { cmd = nodemonBin; args = ['--watch', 'dev-server.js', 'dev-server.js'] }
+    else { cmd = process.platform === 'win32' ? 'node.exe' : 'node'; args = ['dev-server.js'] }
   } else {
-    const npmCmd = process.platform === 'win32' ? 'npm.cmd' : 'npm'
-    cmd = npmCmd
-    args = ['run', 'dev:http']
+    if (useWatch && nodemonBin) { cmd = nodemonBin; args = ['--watch', 'src', '--ext', 'ts,js,json', '--exec', 'node --loader ts-node/esm src/dev-http.ts'] }
+    else { cmd = npmCmd; args = ['run', 'dev:http'] }
   }
   // Preflight: ensure port is free
   if (force) {
@@ -243,7 +266,7 @@ async function startMCP({ port = 8787, corsOrigin, mini = true, force = true, en
     const busy = await isPortBusy(port)
     if (busy) { console.error(`Port ${port} is busy. Use --force to free it.`); process.exit(1) }
   }
-  console.log(`Starting MCP (${mini ? 'mini' : 'dev:http'}) on :${port}...`)
+  console.log(`Starting MCP (${prod ? 'prod:dist' : mini ? 'mini' : useWatch ? 'dev:watch' : 'dev:http'}) on :${port}...`)
   const child = spawn(cmd, args, { cwd: MCP_DIR, env, detached: true, stdio: ['ignore', outFd, errFd] })
   writeMcpPid(child.pid)
   child.unref()
@@ -295,11 +318,20 @@ function logsMCP({ follow = false, lines = 200 } = {}) {
   }
 }
 
-async function startAll({ uiPort = 65001, mcpPort = 65000, mini = true, open = false, cors, force = true, envFile } = {}) {
+async function startAll({ uiPort = 62008, mcpPort = 62007, mini = true, open = false, cors, force = true, envFile, prod = false, externalMcp = false, baseUrl } = {}) {
   const uiOrigin = `http://localhost:${uiPort}`
   const corsOrigin = cors || '*'
-  await startMCP({ port: mcpPort, corsOrigin, mini, force, envFile })
-  await startUI({ port: uiPort, baseUrl: `http://localhost:${mcpPort}`, open, force, envFile })
+  if (!externalMcp) {
+    await startMCP({ port: mcpPort, corsOrigin, mini, force, envFile, prod })
+    await startUI({ port: uiPort, baseUrl: `http://localhost:${mcpPort}`, open, force, envFile })
+  } else {
+    const url = baseUrl || process.env.NEXT_PUBLIC_MCP_BASE_URL
+    if (!url) {
+      console.error('Error: --external-mcp requires --base-url to be set (e.g., http://172.72.72.2:62007)')
+      process.exit(1)
+    }
+    await startUI({ port: uiPort, baseUrl: url, open, force, envFile })
+  }
 }
 
 async function stopAll() {
@@ -316,14 +348,14 @@ async function main() {
   const [domain, subcmd] = argv._
   const help = () => {
     console.log(`Usage:
-  traide-runner ui <start|stop|status|logs> [--prod] [--port 3333] [--open] [--base-url URL] [--env KEY=VALUE] [--env-file .env] [--no-force]
-  traide-runner mcp <start|stop|status|logs> [--port 8787] [--cors http://localhost:3333] [--mini] [--env-file .env] [--no-force]
-  traide-runner all <start|stop|status|nuke> [--ui-port 3333] [--mcp-port 8787] [--mini] [--open] [--env-file .env] [--no-force]
+  traide-runner ui <start|stop|status|logs> [--prod] [--port 62008] [--open] [--base-url URL] [--env KEY=VALUE] [--env-file .env] [--no-force]
+  traide-runner mcp <start|stop|status|logs> [--port 62007] [--cors http://localhost:62008] [--mini] [--watch] [--prod] [--env-file .env] [--no-force]
+  traide-runner all <start|stop|status|nuke> [--ui-port 62008] [--mcp-port 62007] [--mini] [--watch] [--prod] [--open] [--env-file .env] [--no-force] [--external-mcp] [--base-url URL]
 `)
   }
   if (!domain) return help()
   if (domain === 'ui') {
-    const port = argv.flags.port ? Number(argv.flags.port) : 3333
+    const port = argv.flags.port ? Number(argv.flags.port) : 62008
     const baseUrl = argv.flags['base-url'] || process.env.NEXT_PUBLIC_MCP_BASE_URL
     const envKVs = ([]).concat(argv.flags.env || []).flat().filter(Boolean)
     const open = Boolean(argv.flags.open)
@@ -338,33 +370,43 @@ async function main() {
       default: return help()
     }
   } else if (domain === 'mcp') {
-    const port = argv.flags.port ? Number(argv.flags.port) : 8787
+    const port = argv.flags.port ? Number(argv.flags.port) : 62007
     const cors = argv.flags.cors
     const force = argv.flags['no-force'] ? false : true
     const envFile = argv.flags['env-file']
-    const mini = argv.flags.mini !== undefined ? Boolean(argv.flags.mini) : true
+    const mini = argv.flags.mini !== undefined
+      ? !(String(argv.flags.mini).toLowerCase() === 'false' || String(argv.flags.mini) === '0')
+      : true
+    if (argv.flags.watch) globalThis.__runnerWatchFlag = true
+    const prod = Boolean(argv.flags.prod)
     switch (subcmd) {
-      case 'start': return await startMCP({ port, corsOrigin: cors, mini, force, envFile })
+      case 'start': return await startMCP({ port, corsOrigin: cors, mini, force, envFile, prod })
       case 'stop': return await stopMCP()
       case 'status': return statusMCP()
       case 'logs': return logsMCP({ follow: Boolean(argv.flags.follow), lines: argv.flags.lines ? Number(argv.flags.lines) : 200 })
       default: return help()
     }
   } else if (domain === 'all') {
-    const uiPort = argv.flags['ui-port'] ? Number(argv.flags['ui-port']) : 65001
-    const mcpPort = argv.flags['mcp-port'] ? Number(argv.flags['mcp-port']) : 65000
-    const mini = argv.flags.mini !== undefined ? Boolean(argv.flags.mini) : true
+    const uiPort = argv.flags['ui-port'] ? Number(argv.flags['ui-port']) : 62008
+    const mcpPort = argv.flags['mcp-port'] ? Number(argv.flags['mcp-port']) : 62007
+    const mini = argv.flags.mini !== undefined
+      ? !(String(argv.flags.mini).toLowerCase() === 'false' || String(argv.flags.mini) === '0')
+      : true
+    if (argv.flags.watch) globalThis.__runnerWatchFlag = true
     const force = argv.flags['no-force'] ? false : true
     const envFile = argv.flags['env-file']
     const open = Boolean(argv.flags.open)
     const cors = argv.flags.cors
+    const prod = Boolean(argv.flags.prod)
+    const externalMcp = Boolean(argv.flags['external-mcp'])
+    const baseUrl = argv.flags['base-url']
     switch (subcmd) {
-      case 'start': return await startAll({ uiPort, mcpPort, mini, open, cors, force, envFile })
+      case 'start': return await startAll({ uiPort, mcpPort, mini, open, cors, force, envFile, prod, externalMcp, baseUrl })
       case 'stop': return await stopAll()
       case 'status': return statusAll()
       case 'nuke': {
         await stopAll()
-        await killPorts([3333, 3000, 4000, 8080, 8787, 65000, 65001])
+        await killPorts([3333, 3000, 4000, 8080, 8787, 65000, 65001, 62007, 62008])
         console.log('All known ports killed.')
         return
       }

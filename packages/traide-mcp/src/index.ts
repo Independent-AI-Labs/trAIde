@@ -2,7 +2,6 @@ import { loadConfig } from './config.js';
 import { logger } from './logger.js';
 import { BinanceProvider } from './providers/binance.js';
 import { startHttpServer } from './http.js';
-import { createMcpServer } from './mcp.js';
 
 async function main() {
   const cfg = loadConfig();
@@ -16,10 +15,18 @@ async function main() {
   // Start HTTP if enabled
   startHttpServer(provider);
 
-  // Start MCP stdio server
-  const server = createMcpServer(provider);
-  await server.start();
-  logger.info('MCP stdio server started');
+  // Start MCP stdio server (dynamically import to avoid hard build-time dep)
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-implied-eval
+    const mod: any = await (new Function('p', 'return import(p)'))('./mcp.js')
+    if (mod && typeof mod.createMcpServer === 'function') {
+      const server = mod.createMcpServer(provider)
+      await server.start()
+      logger.info('MCP stdio server started')
+    }
+  } catch (e) {
+    logger.warn('MCP stdio not started', { err: (e as Error).message })
+  }
 }
 
 // Only run if executed directly (not imported)

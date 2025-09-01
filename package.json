@@ -32,7 +32,11 @@
     "ui:stop": "node packages/traide-runner/bin/traide-runner.js ui stop",
     "ui:status": "node packages/traide-runner/bin/traide-runner.js ui status",
     "ui:logs": "node packages/traide-runner/bin/traide-runner.js ui logs --follow",
+    "ui:test": "vitest run --config apps/traide-ui/vitest.config.ts",
     "dev:start": "node packages/traide-runner/bin/traide-runner.js all start --mini --open",
+    "demo:start": "node packages/traide-runner/bin/traide-runner.js all start --prod --mini=false --open",
+    "dev:watch": "TRAIDE_WATCH=1 node packages/traide-runner/bin/traide-runner.js all start --mini=false --watch --open",
+    "dev:watch:external": "TRAIDE_WATCH=1 node packages/traide-runner/bin/traide-runner.js all start --external-mcp --base-url http://172.72.72.2:62007 --ui-port 62008 --open",
     "dev:stop": "node packages/traide-runner/bin/traide-runner.js all stop",
     "dev:status": "node packages/traide-runner/bin/traide-runner.js all status"
   },
@@ -53,7 +57,8 @@
     "typescript": "^5.5.0",
     "vitest": "^1.5.0",
     "@vitest/coverage-v8": "^1.5.0",
-    "ws": "^8.17.1"
+    "ws": "^8.17.1",
+    "nodemon": "^3.1.0"
   },
   "workspaces": [
     "packages/*",

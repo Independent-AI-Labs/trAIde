@@ -19,8 +19,8 @@ Why it’s useful
 
 What’s included
 - Core TA engine (TypeScript): broad indicator coverage, fixtures, and utils.
-- MCP mini server: `/health`, `/klines` (history), `/stream/klines` (SSE); CORS handled.
-- React UI: glass minimal hero chart, ChartWorkspace, endpoint control, status/latency.
+- MCP servers: a full MCP (stdio + HTTP + SSE) and a mini HTTP/SSE demo; endpoints include `/health`, `/symbols`, `/klines`, `/indicators`, `/stream/klines`.
+- React UI: glass minimal hero chart, ChartWorkspace, endpoint control, status/latency, and a same‑origin proxy at `/api/mcp/*`.
 - Runner CLI: start/stop/status/logs/nuke; port preflight; `.env` support.
 - Docker: images for UI + MCP with a compose file.
 
@@ -28,8 +28,8 @@ Install
 - `npm install`
 
 Operate (at a glance)
-- Use the runner to launch UI and MCP together (defaults: UI 65001, MCP 65000).
-- Open the UI and, if needed, set your MCP URL via the top‑right “Endpoint” pill.
+- Use the runner to launch UI and MCP together (defaults: UI 62008, MCP 62007). Root scripts: `npm run dev:start|dev:stop|dev:status`, UI tests: `npm run ui:test`.
+- Open the UI and, if needed, set your MCP URL via the top‑right “Endpoint” pill; UI talks to MCP through `/api/mcp/*`.
 - For containerized runs, build with the provided Dockerfiles and use the compose file.
 
 System view
@@ -63,7 +63,7 @@ flowchart LR
 
 Docs
 - TA engine: DOCUMENTATION-TA.md, docs/API.md
-- UI spec: SPEC-UI.md, SPEC-REACT-COMP.md
+- UI: DOCUMENTATION-REACT.mc, SPEC-UI.md, SPEC-REACT-COMP.md
 - MCP: DOCUMENTATION-MCP.md
 
 Contributing

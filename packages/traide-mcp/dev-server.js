@@ -121,7 +121,7 @@ const server = http.createServer((req, res) => {
   res.end(JSON.stringify({ error: 'not_found' }))
 })
 
-server.listen(PORT, () => {
+server.listen(PORT, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
   console.log(`Mini MCP HTTP listening on :${PORT}`)
 })
