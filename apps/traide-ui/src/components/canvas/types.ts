@@ -6,6 +6,7 @@ export type TileKind =
   | 'heatmap'
   | 'compare'
   | 'gallery'
+  | 'rich-text'
 
 export type Tile = {
   id: string
@@ -30,5 +31,5 @@ export const PANEL_REGISTRY: RegistryItem[] = [
   { id: 'heatmap', title: 'Heatmap', description: 'Group performance' },
   { id: 'compare', title: 'Compare', description: 'Compare multiple symbols' },
   { id: 'gallery', title: 'Gallery', description: 'UI components demo' },
+  { id: 'rich-text', title: 'Notes', description: 'Rich‑text editor / notes' },
 ]
-

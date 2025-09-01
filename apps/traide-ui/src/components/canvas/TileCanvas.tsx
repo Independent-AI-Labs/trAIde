@@ -10,6 +10,7 @@ import { ScannerPanel } from '@/components/landing/ScannerPanel'
 import { ComparePanel } from '@/components/landing/ComparePanel'
 import { HeatmapPanel } from '@/components/landing/HeatmapPanel'
 import dynamic from 'next/dynamic'
+import { RichTextPanel } from '@/components/panels/RichTextPanel'
 
 // lightweight chart wrapper used in landing; avoid SSR
 const OverlayChart = dynamic(() => import('@/components/charts/OverlayChart').then(m => m.OverlayChart), { ssr: false })
@@ -33,7 +34,7 @@ function GalleryPanel() {
   )
 }
 
-function renderTileContent(kind: TileKind) {
+function renderTileContent(kind: TileKind, id: string) {
   switch (kind) {
     case 'chart':
       return <ChartPanelInner />
@@ -49,6 +50,8 @@ function renderTileContent(kind: TileKind) {
       return <ComparePanel />
     case 'gallery':
       return <GalleryPanel />
+    case 'rich-text':
+      return <RichTextPanel storageKey={`traide.richtext.${id}`} />
     default:
       return <div className="text-white/70">Unknown panel</div>
   }
@@ -61,13 +64,13 @@ function titleFor(kind: TileKind): string {
 
 function nextId() { return Math.random().toString(36).slice(2, 9) }
 
-const LS_KEY = 'traide.tiles.v1'
-const LS_LAYOUTS = 'traide.layouts.v1'
+const DEFAULT_TILES_KEY = 'traide.tiles.v1'
+const DEFAULT_LAYOUTS_KEY = 'traide.layouts.v1'
 
-function loadLayouts(): Record<string, Tile[]> {
+function loadLayouts(baseKey?: string): Record<string, Tile[]> {
   if (typeof window === 'undefined') return {}
   try {
-    const raw = window.localStorage.getItem(LS_LAYOUTS)
+    const raw = window.localStorage.getItem(baseKey ? `${baseKey}.layouts` : DEFAULT_LAYOUTS_KEY)
     if (!raw) return {}
     const parsed = JSON.parse(raw)
     if (parsed && typeof parsed === 'object') return parsed as Record<string, Tile[]>
@@ -75,12 +78,12 @@ function loadLayouts(): Record<string, Tile[]> {
   return {}
 }
 
-function saveLayouts(obj: Record<string, Tile[]>) {
+function saveLayouts(obj: Record<string, Tile[]>, baseKey?: string) {
   if (typeof window === 'undefined') return
-  try { window.localStorage.setItem(LS_LAYOUTS, JSON.stringify(obj)) } catch {}
+  try { window.localStorage.setItem(baseKey ? `${baseKey}.layouts` : DEFAULT_LAYOUTS_KEY, JSON.stringify(obj)) } catch {}
 }
 
-export function TileCanvas() {
+export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKey?: string; seed?: Tile[] }) {
   const [tiles, setTiles] = useState<Tile[]>([])
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
@@ -110,23 +113,27 @@ export function TileCanvas() {
   // Load persisted layout on mount
   useEffect(() => {
     if (typeof window === 'undefined') return
-    setLayouts(loadLayouts())
+    setLayouts(loadLayouts(storageKey))
     try {
-      const raw = window.localStorage.getItem(LS_KEY)
-      if (!raw) return
+      const key = storageKey || DEFAULT_TILES_KEY
+      const raw = window.localStorage.getItem(key)
+      if (!raw) {
+        if (seed && seed.length) setTiles(seed)
+        return
+      }
       const parsed = JSON.parse(raw)
       if (Array.isArray(parsed)) {
         const sane = parsed.filter((p) => p && typeof p.id === 'string' && typeof p.kind === 'string')
         if (sane.length) setTiles(sane as Tile[])
       }
     } catch {}
-  }, [])
+  }, [storageKey, seed])
 
   // Persist layout on change
   useEffect(() => {
     if (typeof window === 'undefined') return
-    try { window.localStorage.setItem(LS_KEY, JSON.stringify(tiles)) } catch {}
-  }, [tiles])
+    try { window.localStorage.setItem(storageKey || DEFAULT_TILES_KEY, JSON.stringify(tiles)) } catch {}
+  }, [tiles, storageKey])
 
   // Close layout menu on outside click
   useEffect(() => {
@@ -146,8 +153,8 @@ export function TileCanvas() {
     if (!n) return
     const next = { ...layouts, [n]: tiles }
     setLayouts(next)
-    saveLayouts(next)
-  }, [layouts, tiles])
+    saveLayouts(next, storageKey)
+  }, [layouts, tiles, storageKey])
   const loadLayout = useCallback((name: string) => {
     const t = layouts[name]
     if (t && Array.isArray(t)) setTiles(t)
@@ -156,15 +163,15 @@ export function TileCanvas() {
     const next = { ...layouts }
     delete next[name]
     setLayouts(next)
-    saveLayouts(next)
-  }, [layouts])
+    saveLayouts(next, storageKey)
+  }, [layouts, storageKey])
   return (
     <div className="relative h-[calc(100vh-120px)] w-full select-none" onContextMenu={onContextMenu}>
       <div className="grid h-full grid-cols-1 gap-4 md:grid-cols-2">
         {tiles.map(t => (
           <div key={t.id} className="min-h-[380px]">
             <TilePanel title={titleFor(t.kind)} onClose={() => closeTile(t.id)}>
-              {renderTileContent(t.kind)}
+              {renderTileContent(t.kind, t.id)}
             </TilePanel>
           </div>
         ))}

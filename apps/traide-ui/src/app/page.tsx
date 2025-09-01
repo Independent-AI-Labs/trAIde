@@ -1,48 +1,24 @@
-import { HeroGlass } from '@/components/hero/HeroGlass'
-import { GlassCard } from '@/components/ui/GlassCard'
-import { WatchlistPanel } from '@/components/landing/WatchlistPanel'
-import { PlaygroundPanel } from '@/components/landing/PlaygroundPanel'
-import { StreamStatusPanel } from '@/components/landing/StreamStatusPanel'
-import { ScannerPanel } from '@/components/landing/ScannerPanel'
-import { ComparePanel } from '@/components/landing/ComparePanel'
-import { HeatmapPanel } from '@/components/landing/HeatmapPanel'
-
-import Link from 'next/link'
+import { TileCanvas } from '@/components/canvas/TileCanvas'
 
 export default function Page() {
+  // Seed a sensible landing layout on first load, then allow users to rearrange
+  const seed = [
+    { id: 'rt1', kind: 'rich-text', x: 0, y: 0, w: 1, h: 1 },
+    { id: 'wl1', kind: 'watchlist', x: 1, y: 0, w: 1, h: 1 },
+    { id: 'ss1', kind: 'stream-status', x: 0, y: 1, w: 1, h: 1 },
+    { id: 'sc1', kind: 'scanner', x: 1, y: 1, w: 1, h: 1 },
+    { id: 'cp1', kind: 'compare', x: 0, y: 2, w: 1, h: 1 },
+    { id: 'hm1', kind: 'heatmap', x: 1, y: 2, w: 1, h: 1 },
+  ] as const
   return (
     <div className="relative">
-      <HeroGlass />
-
-      <section className="mx-auto mt-2 max-w-6xl px-6 pb-24">
-        <div className="grid gap-6 md:grid-cols-3">
-          <GlassCard title="Watchlist" subtitle="Live mini‑charts, 1m" >
-            <WatchlistPanel />
-          </GlassCard>
-          <GlassCard title="Playground" subtitle="RSI · PPO controls">
-            <PlaygroundPanel />
-          </GlassCard>
-          <GlassCard title="Stream Health" subtitle="Latency · tick count" floating>
-            <StreamStatusPanel />
-          </GlassCard>
-        </div>
-        <div className="mt-6 grid gap-6 md:grid-cols-2">
-          <GlassCard title="Scanner" subtitle="Change · Range · Volume · Trend">
-            <ScannerPanel />
-          </GlassCard>
-          <GlassCard title="Compare" subtitle="Normalize to 100 and compare">
-            <ComparePanel />
-          </GlassCard>
-        </div>
-        <div className="mt-6">
-          <GlassCard title="Heatmap" subtitle="Group performance (1h window)">
-            <HeatmapPanel />
-          </GlassCard>
-        </div>
-        <div className="mt-8 flex justify-end gap-3 text-sm text-white/80">
-          <Link className="rounded-lg border border-white/10 bg-white/5 px-3 py-2" href="/app/dashboard">Open Dashboard</Link>
-        </div>
-      </section>
+      <div className="mx-auto max-w-7xl px-6 pt-8">
+        <h1 className="text-3xl font-bold text-white/90">trAIde — Live Technical Analysis</h1>
+        <p className="mt-2 text-sm text-white/70">Fully composable panels. Right‑click to add more.</p>
+      </div>
+      <div className="mt-4">
+        <TileCanvas storageKey="traide.landing.tiles.v1" seed={seed as any} />
+      </div>
     </div>
   )
 }

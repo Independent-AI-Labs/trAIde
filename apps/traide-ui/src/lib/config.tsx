@@ -12,18 +12,6 @@ function normalizeBaseUrl(v: string) {
   return s
 }
 
-function isLocalhostUrl(v: string) {
-  try {
-    const u = new URL(v)
-    return (
-      u.hostname === 'localhost' ||
-      u.hostname === '127.0.0.1' ||
-      u.hostname === '::1'
-    )
-  } catch {
-    return false
-  }
-}
 
 function defaultBaseUrl() {
   // Prefer current host with MCP port to avoid localhost-stuck issues
