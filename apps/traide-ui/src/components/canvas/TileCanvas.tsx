@@ -87,6 +87,7 @@ export function TileCanvas() {
   const [layouts, setLayouts] = useState<Record<string, Tile[]>>({})
   const [savingName, setSavingName] = useState('')
   const [layoutOpen, setLayoutOpen] = useState(false)
+  const [layoutAnchor, setLayoutAnchor] = useState<HTMLDivElement | null>(null)
   const onContextMenu = useCallback((e: React.MouseEvent) => {
     // Ignore right-clicks originating from overlay UIs
     const target = e.target as HTMLElement
@@ -126,6 +127,18 @@ export function TileCanvas() {
     if (typeof window === 'undefined') return
     try { window.localStorage.setItem(LS_KEY, JSON.stringify(tiles)) } catch {}
   }, [tiles])
+
+  // Close layout menu on outside click
+  useEffect(() => {
+    if (!layoutOpen) return
+    function onDown(e: MouseEvent) {
+      const el = layoutAnchor
+      if (!el) return
+      if (!el.contains(e.target as Node)) setLayoutOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [layoutOpen, layoutAnchor])
 
   // Layout actions
   const saveCurrentAs = useCallback((name: string) => {
@@ -177,6 +190,7 @@ export function TileCanvas() {
           className="pointer-events-auto inline-flex gap-2 rounded-xl border border-white/10 bg-white/10 p-2 backdrop-blur ui-overlay"
           data-ui-overlay="1"
           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation() }}
+          ref={setLayoutAnchor}
         >
           <button className="rounded-lg bg-white/10 px-2 py-1 text-xs text-white/80 hover:bg-white/15" onClick={() => setLayoutOpen(v => !v)}>
             Layouts

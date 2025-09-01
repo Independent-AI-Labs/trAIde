@@ -8,13 +8,19 @@ export function ComponentPalette({ items, open, onClose, onSelect }: { items: Re
   const ref = useRef<HTMLDivElement | null>(null)
   useEffect(() => {
     function onEsc(e: KeyboardEvent) { if (e.key === 'Escape') onClose() }
+    function onDown(e: MouseEvent) {
+      const el = ref.current
+      if (!el) return
+      if (!el.contains(e.target as Node)) onClose()
+    }
     document.addEventListener('keydown', onEsc)
-    return () => document.removeEventListener('keydown', onEsc)
+    document.addEventListener('mousedown', onDown)
+    return () => { document.removeEventListener('keydown', onEsc); document.removeEventListener('mousedown', onDown) }
   }, [onClose])
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-8 backdrop-blur-sm ui-overlay" onContextMenu={(e) => { e.preventDefault(); e.stopPropagation() }}>
-      <div ref={ref} className="w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/90 shadow-2xl">
+      <div ref={ref} className="w-full max-w-xl overflow-hidden rounded-2xl border border-white/10 bg-neutral-900/90 shadow-2xl" onMouseDown={(e) => e.stopPropagation()}>
         <div className="border-b border-white/10 p-3">
           <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search components…" className="w-full rounded-md border border-white/10 bg-black/40 px-3 py-2 outline-none placeholder:text-white/40" />
         </div>
