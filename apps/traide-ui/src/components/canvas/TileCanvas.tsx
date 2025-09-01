@@ -85,6 +85,8 @@ function saveLayouts(obj: Record<string, Tile[]>, baseKey?: string) {
 
 export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKey?: string; seed?: Tile[] }) {
   const [tiles, setTiles] = useState<Tile[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [cols, setCols] = useState<number>(1)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [layouts, setLayouts] = useState<Record<string, Tile[]>>({})
@@ -165,11 +167,60 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
     setLayouts(next)
     saveLayouts(next, storageKey)
   }, [layouts, storageKey])
+  // derive responsive columns (match md breakpoint)
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 768px)')
+    const apply = () => setCols(mq.matches ? 2 : 1)
+    apply()
+    mq.addEventListener('change', apply)
+    return () => mq.removeEventListener('change', apply)
+  }, [])
+
+  // basic collision check for target slot
+  const occupied = useCallback((id: string, x: number, y: number, w: number, h: number) => {
+    return tiles.some(t => t.id !== id && !(x + w <= t.x || t.x + t.w <= x || y + h <= t.y || t.y + t.h <= y))
+  }, [tiles])
+
+  // keyboard movement for selected tile (arrow keys)
+  const onKeyDown = useCallback((e: React.KeyboardEvent) => {
+    if (!selectedId) return
+    const idx = tiles.findIndex(t => t.id === selectedId)
+    if (idx < 0) return
+    const t = tiles[idx]
+    let dx = 0, dy = 0
+    if (e.key === 'ArrowLeft') dx = -1
+    else if (e.key === 'ArrowRight') dx = 1
+    else if (e.key === 'ArrowUp') dy = -1
+    else if (e.key === 'ArrowDown') dy = 1
+    else return
+    e.preventDefault()
+    const next = { ...t, x: Math.max(0, Math.min(Math.max(0, cols - t.w), t.x + dx)), y: Math.max(0, t.y + dy) }
+    // simple collision resolve: if occupied, push down until free
+    let ty = next.y
+    while (occupied(next.id, next.x, ty, next.w, next.h)) ty++
+    next.y = ty
+    const copy = tiles.slice(); copy[idx] = next
+    setTiles(copy)
+  }, [selectedId, tiles, cols, occupied])
+
   return (
-    <div className="relative h-[calc(100vh-120px)] w-full select-none" onContextMenu={onContextMenu}>
-      <div className="grid h-full grid-cols-1 gap-4 md:grid-cols-2">
+    <div
+      className="relative h-[calc(100vh-120px)] w-full select-none"
+      onContextMenu={onContextMenu}
+      tabIndex={0}
+      onKeyDown={onKeyDown}
+    >
+      <div className="grid h-full grid-cols-1 gap-4 md:grid-cols-2" style={{ gridAutoRows: '380px' }}>
         {tiles.map(t => (
-          <div key={t.id} className="min-h-[380px]">
+          <div
+            key={t.id}
+            className={"min-h-[380px] outline-2 outline-offset-2 " + (selectedId === t.id ? 'outline-blue-400/70' : 'outline-transparent')}
+            style={{
+              gridColumn: `${Math.min(t.x + 1, cols)} / span ${Math.min(t.w, cols)}`,
+              gridRow: `${t.y + 1} / span ${Math.max(1, t.h)}`,
+            }}
+            onMouseDown={(e) => { e.stopPropagation(); setSelectedId(t.id) }}
+          >
             <TilePanel title={titleFor(t.kind)} onClose={() => closeTile(t.id)}>
               {renderTileContent(t.kind, t.id)}
             </TilePanel>
