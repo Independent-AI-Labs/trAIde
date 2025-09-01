@@ -26,8 +26,13 @@ function isLocalhostUrl(v: string) {
 }
 
 function defaultBaseUrl() {
-  // Default MCP endpoint (local)
-  return 'http://localhost:62007'
+  // Prefer current host with MCP port to avoid localhost-stuck issues
+  try {
+    const loc = new URL(window.location.origin)
+    return `${loc.protocol}//${loc.hostname}:62007`
+  } catch {
+    return 'http://localhost:62007'
+  }
 }
 
 type Ctx = {
@@ -56,16 +61,8 @@ export function MCPConfigProvider({ children }: { children: React.ReactNode }) {
       } catch {}
       return
     }
-    // Migrate away from localhost-stuck values
+    // Start from saved or sensible default (current host:62007)
     const normalized = normalizeBaseUrl(ls || '')
-    if (normalized && isLocalhostUrl(normalized)) {
-      setBaseUrlState(def)
-      try {
-        localStorage.setItem(KEY, def)
-        document.cookie = `mcp=${encodeURIComponent(def)}; path=/; max-age=${60 * 60 * 24 * 365}`
-      } catch {}
-      // continue to probe
-    }
     const val = normalized || def
     setBaseUrlState(val)
     try { document.cookie = `mcp=${encodeURIComponent(val)}; path=/; max-age=${60 * 60 * 24 * 365}` } catch {}
@@ -84,10 +81,9 @@ export function MCPConfigProvider({ children }: { children: React.ReactNode }) {
           candidates.push(`${loc.protocol}//${loc.hostname}:65000`)
           candidates.push(`${loc.protocol}//${loc.hostname}:8787`)
         } catch {}
+        // Fallbacks commonly used in local/dev LANs
         candidates.push('http://localhost:62007')
-        candidates.push('http://172.72.72.2:62007')
-        candidates.push('http://172.72.72.2:65000')
-        candidates.push('http://172.72.72.2:8787')
+        // Avoid pinning to specific IP unless provided via ?mcp or Settings
         for (const c of candidates) {
           try {
             const r = await fetch(c.replace(/\/$/, '') + '/health', { mode: 'cors' })

@@ -31,6 +31,11 @@ export function EndpointControl() {
     document.addEventListener('keydown', onEsc)
     return () => { document.removeEventListener('mousedown', onDown); document.removeEventListener('keydown', onEsc) }
   }, [open])
+
+  // Keep input value in sync with current base when dialog opens or base changes
+  useEffect(() => {
+    if (open) setVal(baseUrl)
+  }, [baseUrl, open])
   return (
     <div className="relative ui-overlay" data-ui-overlay="1" onContextMenu={(e) => { e.preventDefault(); e.stopPropagation() }}>
       {!open ? (
