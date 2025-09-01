@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MiniChart } from '@/components/charts/MiniChart'
 import { useSSE } from '@/lib/useSSE'
-import { sseUrl } from '@/lib/mcp'
+import { sseUrl, useMcpBaseUrl } from '@/lib/mcp'
 
 type KEvent = { type: 'kline'; candle?: { t: number; c: number } }
 
@@ -19,6 +19,7 @@ export function WatchlistPanel({ symbols = DEFAULT, interval = '1m' }: { symbols
 }
 
 function WatchItem({ symbol, interval }: { symbol: string; interval: string }) {
+  useMcpBaseUrl()
   const url = sseUrl(`/stream/klines?symbol=${symbol}&interval=${interval}`)
   const { last, connected } = useSSE<KEvent>(url, true)
   const [series, setSeries] = useState<{ t: number; c: number }[]>([])

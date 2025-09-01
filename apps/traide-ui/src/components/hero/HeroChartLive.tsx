@@ -1,6 +1,6 @@
 "use client"
 import { useSSE } from '@/lib/useSSE'
-import { sseUrl } from '@/lib/mcp'
+import { sseUrl, useMcpBaseUrl } from '@/lib/mcp'
 import { useEffect, useRef, useState } from 'react'
 import { MiniChart } from '../charts/MiniChart'
 import { StatusPill } from '@/components/ui/StatusPill'
@@ -14,6 +14,8 @@ type KlineEvent = {
 }
 
 export function HeroChartLive({ symbol = 'BTCUSDT', interval = '1m' }: { symbol?: string; interval?: string }) {
+  // Subscribe to base URL so we re-render and reconnect when it changes
+  useMcpBaseUrl()
   // Proxy through same-origin to avoid CORS, the server route forwards to baseUrl
   const url = sseUrl(`/stream/klines?symbol=${symbol}&interval=${interval}&indicators=ppo,rsi`)
   const { last, connected } = useSSE<KlineEvent>(url, true)

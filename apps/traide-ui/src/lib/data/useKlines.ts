@@ -1,10 +1,11 @@
 "use client"
 import { useEffect, useRef, useState } from 'react'
 import { Kline, useFetchers } from './fetchers'
-import { sseUrl } from '@/lib/mcp'
+import { sseUrl, useMcpBaseUrl } from '@/lib/mcp'
 
 export function useKlines({ symbol, interval, limit = 240, stream = false }: { symbol: string; interval: string; limit?: number; stream?: boolean }) {
   const { fetchKlinesCached } = useFetchers()
+  const base = useMcpBaseUrl()
   const [data, setData] = useState<Kline[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -62,7 +63,7 @@ export function useKlines({ symbol, interval, limit = 240, stream = false }: { s
     }
     open()
     return () => { cancelled = true; if (timer) window.clearTimeout(timer); if (esRef.current) esRef.current.close(); esRef.current = null }
-  }, [symbol, interval, stream])
+  }, [symbol, interval, stream, base])
 
   return { data, loading, error, ticks }
 }

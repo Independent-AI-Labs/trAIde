@@ -1,9 +1,10 @@
 "use client"
 import { StatusPill } from '@/components/ui/StatusPill'
 import { useEffect, useRef, useState } from 'react'
-import { sseUrl } from '@/lib/mcp'
+import { sseUrl, useMcpBaseUrl } from '@/lib/mcp'
 
 export function StreamStatusPanel() {
+  const base = useMcpBaseUrl()
   const [ticks, setTicks] = useState(0)
   const [last, setLast] = useState<number | null>(null)
   const esRef = useRef<EventSource | null>(null)
@@ -13,7 +14,7 @@ export function StreamStatusPanel() {
     esRef.current = es
     es.onmessage = () => { setTicks((t) => t + 1); setLast(Date.now()) }
     return () => { es.close(); esRef.current = null }
-  }, [])
+  }, [base])
 
   return (
     <div className="space-y-3">

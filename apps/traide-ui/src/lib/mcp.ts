@@ -1,4 +1,5 @@
 "use client"
+import { useMcpConfig } from '@/lib/config'
 
 // Client-side helper to resolve MCP base URL for SSE and other direct calls.
 // Prefers NEXT_PUBLIC_MCP_BASE_URL, then a `mcp` cookie (URL-encoded), else undefined.
@@ -22,4 +23,15 @@ export function sseUrl(pathAndQuery: string): string {
   if (base) return `${base.replace(/\/$/, '')}${path}`
   // Fallback to same-origin proxy
   return `/api/mcp${path}`
+}
+
+// Hook to subscribe to MCP base changes from context so components re-render
+export function useMcpBaseUrl(): string {
+  try {
+    const { baseUrl } = useMcpConfig()
+    return baseUrl
+  } catch {
+    // If not inside provider, fall back to client resolver
+    return getMcpBaseUrlClient() || ''
+  }
 }
