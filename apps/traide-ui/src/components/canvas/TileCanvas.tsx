@@ -203,7 +203,11 @@ export function TileCanvas() {
                 {Object.entries(layouts).map(([name]) => (
                   <div key={name} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 hover:bg-white/10">
                     <button className="truncate" onClick={() => { loadLayout(name); setLayoutOpen(false) }}>{name}</button>
-                    <button className="text-white/50 hover:text-rose-300" onClick={() => deleteLayout(name)}>Delete</button>
+                    <button aria-label="Delete layout" title="Delete" className="rounded p-1 text-white/50 hover:text-rose-300" onClick={() => deleteLayout(name)}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden>
+                        <path d="M9 3h6m-7 3h8m-8 0l-.8 13a2 2 0 0 0 2 2h5.6a2 2 0 0 0 2-2L16 6M10 10v7m4-7v7" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    </button>
                   </div>
                 ))}
               </div>
