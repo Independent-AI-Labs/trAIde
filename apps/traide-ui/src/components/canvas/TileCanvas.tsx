@@ -88,7 +88,7 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [cols, setCols] = useState<number>(1)
   const canvasRef = useRef<HTMLDivElement | null>(null)
-  const [drag, setDrag] = useState<null | { id: string; dx: number; dy: number; w: number; h: number }>(null)
+  const [drag, setDrag] = useState<null | { id: string; dx: number; dy: number; w: number; h: number; px: number; py: number }>(null)
   const [resize, setResize] = useState<null | { id: string; startX: number; startY: number; w: number; h: number }>(null)
   const [snapFx, setSnapFx] = useState<null | { x: number; y: number; vertical: boolean }>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
@@ -229,15 +229,21 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
     const dx = px - tile.x * (colW + metrics.gap)
     const dy = py - tile.y * (rowH + metrics.gap)
     setSelectedId(id)
-    setDrag({ id, dx, dy, w: tile.w, h: tile.h })
+    setDrag({ id, dx, dy, w: tile.w, h: tile.h, px, py })
   }, [tiles, metrics])
 
   useEffect(() => {
     if (!drag && !resize) return
     const onMove = (e: MouseEvent) => {
       e.preventDefault()
-      // trigger re-render via state toggles; actual preview computed in render
-      setDrag(d => (d ? { ...d } : d))
+      // update pointer pos for live preview
+      setDrag(d => {
+        if (!d) return d
+        const el = canvasRef.current
+        if (!el) return d
+        const rect = el.getBoundingClientRect()
+        return { ...d, px: e.clientX - rect.left, py: e.clientY - rect.top }
+      })
       setResize(r => (r ? { ...r } : r))
     }
     const onUp = (e: MouseEvent) => {
@@ -245,8 +251,8 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
         const el = canvasRef.current
         if (el) {
           const rect = el.getBoundingClientRect()
-          const px = e.clientX - rect.left
-          const py = e.clientY - rect.top
+          const px = drag.px ?? e.clientX - rect.left
+          const py = drag.py ?? e.clientY - rect.top
           const { colW, rowH, gap } = metrics
           const tile = tiles.find(t => t.id === drag.id)
           if (tile) {
@@ -320,6 +326,8 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
             style={{
               gridColumn: `${Math.min(t.x + 1, cols)} / span ${Math.min(t.w, cols)}`,
               gridRow: `${t.y + 1} / span ${Math.max(1, t.h)}`,
+              transform: drag && drag.id === t.id ? `translate(${(drag.px - drag.dx) - t.x * (metrics.colW + metrics.gap)}px, ${(drag.py - drag.dy) - t.y * (metrics.rowH + metrics.gap)}px)` : undefined,
+              zIndex: drag && drag.id === t.id ? 30 : undefined,
             }}
             onMouseDown={(e) => { e.stopPropagation(); setSelectedId(t.id) }}
           >
@@ -388,6 +396,23 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
           )}
         </div>
       </div>
+
+      {/* Drop preview rectangle while dragging */}
+      {drag && (() => {
+        const tile = tiles.find(tt => tt.id === drag.id)
+        if (!tile) return null
+        const { colW, rowH, gap } = metrics
+        let gx = Math.max(0, Math.min(Math.max(0, cols - tile.w), Math.floor((drag.px - drag.dx) / (colW + gap))))
+        let gy = Math.max(0, Math.floor((drag.py - drag.dy) / (rowH + gap)))
+        while (occupied(tile.id, gx, gy, tile.w, tile.h)) gy++
+        const left = gx * (colW + gap)
+        const top = gy * (rowH + gap)
+        const width = tile.w * (colW + gap) - gap
+        const height = tile.h * (rowH + gap) - gap
+        return (
+          <div className="pointer-events-none absolute z-20 rounded-xl border-2 border-sky-300/70 bg-sky-300/10" style={{ left, top, width, height }} />
+        )
+      })()}
 
       {snapFx && (() => {
         const { colW, rowH, gap } = metrics
