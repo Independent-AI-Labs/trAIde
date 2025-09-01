@@ -1,8 +1,9 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect } from 'vitest';
 
-// Opt-in WS E2E to avoid flakiness and CI/network constraints
-const enabled = process.env.BINANCE_WS_E2E === '1';
+// Run locally by default; on GitHub Actions require opt-in flag
+const ci = process.env.GITHUB_ACTIONS === 'true';
+const enabled = ci ? process.env.BINANCE_WS_E2E === '1' : true;
 let hasWs = enabled;
 if (enabled) {
   try { await import('ws'); } catch { hasWs = false; }
@@ -20,17 +21,17 @@ if (enabled) {
       const unsubscribe = provider.streamKlines({ symbol: 'BTCUSDT', interval: '1m', closedOnly: false }, (e) => {
         if (e.type === 'kline') {
           events.push(e);
-          if (events.length >= 2) {
+          if (events.length >= 1) {
             unsubscribe();
             resolve();
           }
         }
       });
-      setTimeout(() => { unsubscribe(); reject(new Error('timeout')); }, 15000);
+      setTimeout(() => { unsubscribe(); reject(new Error('timeout')); }, 25000);
     });
     expect(events.length).toBeGreaterThanOrEqual(1);
     const ev = events[0];
     expect(ev.candle).toBeTruthy();
     expect(typeof ev.candle.t).toBe('number');
-  }, 20000);
+  }, 30000);
 });

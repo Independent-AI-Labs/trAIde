@@ -85,9 +85,8 @@ export class BinanceProvider implements MarketDataProvider {
       if (!active) return;
       const url = `${this.wsUrl}/${stream}`;
       (async () => {
-        // dynamic import via function to avoid TS resolution of 'ws' types
-        // eslint-disable-next-line @typescript-eslint/no-implied-eval
-        const mod: any = await (new Function('m', 'return import(m)'))('ws');
+        // Dynamic import; Vitest/Vite SSR handles 'ws' via external deps
+        const mod: any = await import('ws');
         const WS = mod?.default ?? mod?.WebSocket ?? mod;
         const ws = new WS(url);
         current = ws;

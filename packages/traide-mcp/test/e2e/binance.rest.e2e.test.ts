@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import { BinanceProvider } from '../../src/providers/binance';
 
-// Opt-in to avoid CI/network flakiness (451/geo or rate limits)
-const enabled = process.env.BINANCE_REST_E2E === '1';
+// Run locally by default; on GitHub Actions require opt-in flag
+const ci = process.env.GITHUB_ACTIONS === 'true';
+const enabled = ci ? process.env.BINANCE_REST_E2E === '1' : true;
 
 const provider = new BinanceProvider(
   process.env.BINANCE_REST_URL ?? 'https://api.binance.com',
