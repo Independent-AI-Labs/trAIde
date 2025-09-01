@@ -2,17 +2,24 @@
 import { useMcpConfig } from '@/lib/config'
 
 // Client-side helper to resolve MCP base URL for SSE and other direct calls.
-// Prefers NEXT_PUBLIC_MCP_BASE_URL, then a `mcp` cookie (URL-encoded), else undefined.
+// Order of precedence (robust): localStorage (user setting) → NEXT_PUBLIC_MCP_BASE_URL → `mcp` cookie → window.location host:62007 → undefined.
 export function getMcpBaseUrlClient(): string | undefined {
   if (typeof window === 'undefined') return undefined
+  try {
+    const ls = window.localStorage.getItem('traide.mcpBaseUrl')
+    if (ls && ls.trim()) return ls.trim()
+  } catch {}
   const env = process.env.NEXT_PUBLIC_MCP_BASE_URL
   if (env && env.trim()) return env.trim()
   try {
     const m = document.cookie.match(/(?:^|; )mcp=([^;]+)/)
     if (m && m[1]) return decodeURIComponent(m[1])
   } catch {}
-  // Sensible dev default; in production set NEXT_PUBLIC_MCP_BASE_URL or mcp cookie
-  return 'http://localhost:62007'
+  try {
+    const loc = new URL(window.location.origin)
+    return `${loc.protocol}//${loc.hostname}:62007`
+  } catch {}
+  return undefined
 }
 
 // Build an SSE-friendly URL: if a base URL is configured, return absolute URL
