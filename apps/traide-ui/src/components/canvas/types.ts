@@ -15,6 +15,7 @@ export type Tile = {
   y: number
   w: number
   h: number
+  settings?: { tickMs?: number; name?: string }
 }
 
 export type RegistryItem = {

@@ -492,7 +492,9 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
               onMouseDown={(e) => { e.stopPropagation(); setSelectedId(t.id) }}
             >
               <TilePanel
-                title={titleFor(t.kind)}
+                title={t.settings?.name ?? titleFor(t.kind)}
+                titleEditable
+                onTitleChange={(name) => setTiles((arr) => arr.map((it) => it.id === t.id ? { ...it, settings: { ...(it.settings || {}), name } } : it))}
                 onClose={() => closeTile(t.id)}
                 onDragStart={(e) => startDrag(t.id, e)}
                 headerRight={

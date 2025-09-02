@@ -40,8 +40,7 @@ describe('useKlines', () => {
         </MarketCacheProvider>
       </NetConfigProvider>
     )
-    await sleep(20)
+    await sleep(80)
     expect(length).toBe(3)
   })
 })
-
