@@ -1,5 +1,5 @@
 "use client"
-import React, { createContext, useContext } from 'react'
+import React, { createContext, useContext, useEffect, useRef, useState } from 'react'
 import type { Tile, TileKind } from '@/components/canvas/types'
 
 export type TickDefaults = {
@@ -53,3 +53,19 @@ export function useTickMs(componentOverride?: number): number {
   return Number.isFinite(resolved) ? Math.max(0, resolved) : fromApp
 }
 
+// Simple ticker that emits an incrementing counter at the resolved tick rate.
+// Panels that are not SSE-driven can depend on `tick` to refresh on schedule.
+export function useTicker(opts: { enabled?: boolean } = {}): number {
+  const { enabled = true } = opts
+  const tickMs = useTickMs()
+  const [tick, setTick] = useState(0)
+  const timerRef = useRef<number | null>(null)
+  useEffect(() => {
+    if (!enabled) return
+    if (!(Number.isFinite(tickMs) && tickMs >= 0)) return
+    const id = window.setInterval(() => setTick((t) => t + 1), Math.max(0, Math.round(tickMs)))
+    timerRef.current = id as unknown as number
+    return () => { if (timerRef.current) window.clearInterval(timerRef.current) }
+  }, [tickMs, enabled])
+  return tick
+}

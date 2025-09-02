@@ -6,6 +6,7 @@ import { IntervalSelect } from '@/components/ui/IntervalSelect'
 import { useFetchers } from '@/lib/data/fetchers'
 import { usePref } from '@/lib/prefs'
 import { useIdlePrefetch } from '@/lib/data/prefetch'
+import { useTicker } from '@/lib/tickConfig'
 
 const COLORS = ['#34d399', '#60a5fa', '#f472b6', '#fbbf24']
 
@@ -15,6 +16,7 @@ export function ComparePanel() {
   const [data, setData] = useState<Record<string, { t: number; c: number }[]>>({})
   const { fetchKlinesCached } = useFetchers()
   useIdlePrefetch(symbols, interval, 240)
+  const tick = useTicker()
 
   useEffect(() => {
     let cancelled = false
@@ -26,7 +28,7 @@ export function ComparePanel() {
     setData({})
     symbols.forEach((s) => { load(s) })
     return () => { cancelled = true }
-  }, [symbols.join(','), interval])
+  }, [symbols.join(','), interval, tick])
 
   const series = useMemo(() => {
     return symbols.map((s, idx) => {

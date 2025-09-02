@@ -7,6 +7,7 @@ import { useFetchers } from '@/lib/data/fetchers'
 import { usePref } from '@/lib/prefs'
 import { DataTable, Column } from '@/components/ui/DataTable'
 import { useIdlePrefetch } from '@/lib/data/prefetch'
+import { useTicker } from '@/lib/tickConfig'
 
 // candle type kept implicit via fetchers; avoid unused type warning
 
@@ -27,6 +28,7 @@ export function ScannerPanel() {
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
   const { fetchKlinesCached } = useFetchers()
+  const tick = useTicker()
 
   const group = getGroup(groupId)
   useIdlePrefetch(group.symbols, interval, lookback)
@@ -55,7 +57,7 @@ export function ScannerPanel() {
       setLoading(false)
     }
     loadAll(); return () => { cancelled = true }
-  }, [groupId, interval, lookback])
+  }, [groupId, interval, lookback, tick])
 
   const filtered = useMemo(() => rows.filter((r) => r.vol >= minVol), [rows, minVol])
   const cols: Column<Row>[] = [

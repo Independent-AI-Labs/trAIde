@@ -5,6 +5,7 @@ import { IntervalSelect } from '@/components/ui/IntervalSelect'
 import { useFetchers } from '@/lib/data/fetchers'
 import { usePref } from '@/lib/prefs'
 import { useIdlePrefetch } from '@/lib/data/prefetch'
+import { useTicker } from '@/lib/tickConfig'
 
 export function HeatmapPanel() {
   const [groupId, setGroupId] = usePref<string>('heatmap.group', 'majors')
@@ -13,6 +14,7 @@ export function HeatmapPanel() {
   useIdlePrefetch(group.symbols, interval, 60)
   const [rows, setRows] = useState<{ symbol: string; changePct: number }[]>([])
   const { fetchKlinesCached } = useFetchers()
+  const tick = useTicker()
 
   useEffect(() => {
     let cancelled = false
@@ -31,7 +33,7 @@ export function HeatmapPanel() {
       if (!cancelled) setRows(out)
     }
     load(); return () => { cancelled = true }
-  }, [groupId, interval])
+  }, [groupId, interval, tick])
 
   const min = useMemo(() => Math.min(...rows.map((r) => r.changePct), 0), [rows])
   const max = useMemo(() => Math.max(...rows.map((r) => r.changePct), 0), [rows])
@@ -39,7 +41,7 @@ export function HeatmapPanel() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between text-sm">
-        <select className="rounded-xl border border-white/15 bg-white/5 px-2 py-1 text-xs text-white/90" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
+        <select className="rounded-xl border border-white/20 bg-base-800/90 px-2 py-1 text-xs text-white shadow-sm focus:outline-none focus:ring-1 focus:ring-white/30" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
           <option value="majors" className="bg-neutral-900">Majors</option>
           <option value="l1" className="bg-neutral-900">Layer 1</option>
           <option value="defi" className="bg-neutral-900">DeFi</option>
@@ -48,10 +50,10 @@ export function HeatmapPanel() {
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {rows.map((r) => (
-          <div key={r.symbol} className="rounded-xl p-3 text-sm text-white/90" style={{ background: colorFor(r.changePct, min, max) }}>
+          <div key={r.symbol} className="rounded-xl p-3 text-sm text-white" style={{ background: colorFor(r.changePct, min, max) }}>
             <div className="flex items-center justify-between">
               <span className="font-medium">{r.symbol}</span>
-              <span className={r.changePct >= 0 ? 'text-emerald-900' : 'text-rose-900'}>{r.changePct >= 0 ? '+' : ''}{r.changePct.toFixed(2)}%</span>
+              <span className="drop-shadow-sm">{r.changePct >= 0 ? '+' : ''}{r.changePct.toFixed(2)}%</span>
             </div>
           </div>
         ))}
