@@ -17,6 +17,8 @@ Why it’s useful
 - 🔧 Tooling‑friendly shape: stable endpoints and structured events for integrations.
 - ✅ Reliable math: parity with Python ta and high test coverage.
 
+![trAIde UI](trAIde-ui.png)
+
 What’s included
 - 📦 Core TA engine (TypeScript): broad indicator coverage, fixtures, and utils.
 - 🧠 MCP servers: a full MCP (stdio + HTTP + SSE) and a mini HTTP/SSE demo; endpoints include `/health`, `/symbols`, `/klines`, `/indicators`, `/stream/klines`.
