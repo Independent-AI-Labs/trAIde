@@ -1,5 +1,5 @@
 "use client"
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { GROUPS } from '@/lib/symbols'
 import { useModals } from '@/lib/ui/modals'
