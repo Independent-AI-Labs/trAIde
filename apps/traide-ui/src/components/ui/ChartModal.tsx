@@ -11,13 +11,14 @@ const OverlayChart = dynamic(() => import('@/components/charts/OverlayChart').th
 
 export function ChartModal() {
   const { chart, closeChart, openChart } = useModals()
+  if (!chart.open) return null
   const [tf, setTf] = useState(chart.tf)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [overlays, setOverlays] = useState<IndicatorOverlay[]>([{ type: 'ema', period: 20, color: 'rgba(99,102,241,1)' }])
 
   useEffect(() => { if (chart.open) setTf(chart.tf) }, [chart.open, chart.tf])
 
-  const { data } = useKlines({ symbol: chart.symbol, interval: tf, limit: 300, stream: true })
+  const { data } = useKlines({ symbol: chart.symbol, interval: tf, limit: 300, stream: chart.open })
   const title = useMemo(() => (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
@@ -41,4 +42,3 @@ export function ChartModal() {
     </>
   )
 }
-

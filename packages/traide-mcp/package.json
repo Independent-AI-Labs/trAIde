@@ -18,6 +18,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "ajv": "^8.17.1",
     "ulid": "^2.3.0",
     "ws": "^8.17.1"
   },

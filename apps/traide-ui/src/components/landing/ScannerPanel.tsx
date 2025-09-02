@@ -5,6 +5,7 @@ import { IntervalSelect } from '@/components/ui/IntervalSelect'
 import { Field } from '@/components/ui/Field'
 import { getGroup } from '@/lib/symbols'
 import { useFetchers } from '@/lib/data/fetchers'
+import { useMcpBaseUrl } from '@/lib/mcp'
 import { usePref } from '@/lib/prefs'
 import { DataTable, Column } from '@/components/ui/DataTable'
 import { useIdlePrefetch } from '@/lib/data/prefetch'
@@ -22,6 +23,8 @@ type Row = {
 }
 
 export function ScannerPanel() {
+  // Touch MCP base/proxy early to ensure correct origin/cookie resolution
+  useMcpBaseUrl()
   const [groupId, setGroupId] = usePref<string>('scanner.group', 'majors')
   const [interval, setInterval] = usePref<'1m' | '5m' | '15m' | '1h' | '4h' | '1d'>('scanner.interval', '1m')
   const [lookback, setLookback] = usePref<number>('scanner.lookback', 120)
