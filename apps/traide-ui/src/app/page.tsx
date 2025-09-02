@@ -12,7 +12,7 @@ export default function Page() {
   ] as const
   return (
     <div className="relative">
-      <div className="mx-auto max-w-7xl px-6 pt-20">
+      <div className="px-4 pt-20 md:px-6">
         <p className="mb-2 text-sm text-white/60">Fully composable panels. Right‑click to add more.</p>
         <TileCanvas storageKey="traide.landing.tiles.v1" seed={seed as any} />
       </div>

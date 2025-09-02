@@ -26,7 +26,7 @@ export function ComparePanel() {
       const candles = cs.map((k) => ({ t: k.t, c: k.c }))
       if (!cancelled) setData((d) => ({ ...d, [sym]: candles }))
     }
-    setData({})
+    // Do not clear existing state to avoid visual resets; update per-symbol instead
     symbols.forEach((s) => { load(s) })
     return () => { cancelled = true }
   }, [symbols.join(','), interval, tick])

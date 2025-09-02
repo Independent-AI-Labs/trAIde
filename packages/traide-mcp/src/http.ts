@@ -6,7 +6,7 @@ import { RateLimiter } from './ratelimit.js';
 import { buildSeries } from './compute.js';
 import * as core from '../../../src/index.js';
 import { metrics, withTiming } from './metrics.js';
-import { mapError } from './validation.js';
+import { mapError, validateKlinesQuery, validateComputeRequest } from './validation.js';
 
 export function startHttpServer(provider: MarketDataProvider) {
   const cfg = loadConfig();
@@ -16,6 +16,8 @@ export function startHttpServer(provider: MarketDataProvider) {
   const server = http.createServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {
       const url = new URL(req.url ?? '/', `http://${req.headers.host}`);
+      const reqId = Math.random().toString(36).slice(2, 10);
+      res.setHeader('x-request-id', reqId);
 
       // CORS handling
       const origin = req.headers.origin as string | undefined;
@@ -36,14 +38,16 @@ export function startHttpServer(provider: MarketDataProvider) {
       const ip = (req.headers['x-forwarded-for'] as string) ?? req.socket.remoteAddress ?? 'unknown';
       if (!limiter.allow(ip)) {
         res.writeHead(429, { 'content-type': 'application/json' });
-        return void res.end(JSON.stringify({ error: 'rate_limited' }));
+        metrics.inc('http_requests_total', { route: 'rate_limited', method: req.method ?? 'GET', status: '429' });
+        return void res.end(JSON.stringify({ error: 'rate_limited', requestId: reqId }));
       }
       // Optional bearer token auth
       if (cfg.httpToken) {
         const auth = (req.headers['authorization'] ?? '').toString();
         if (!auth.startsWith('Bearer ') || auth.slice(7) !== cfg.httpToken) {
           res.writeHead(401, { 'content-type': 'application/json' });
-          return void res.end(JSON.stringify({ error: 'unauthorized' }));
+          metrics.inc('http_requests_total', { route: 'unauthorized', method: req.method ?? 'GET', status: '401' });
+          return void res.end(JSON.stringify({ error: 'unauthorized', requestId: reqId }));
         }
       }
 
@@ -51,7 +55,7 @@ export function startHttpServer(provider: MarketDataProvider) {
         metrics.inc('http_requests_total', { route: 'health', method: 'GET' });
         res.writeHead(200, { 'content-type': 'application/json' });
         return void res.end(
-          JSON.stringify({ status: 'ok', uptime: process.uptime(), version: '0.1.0', provider: 'binance' }),
+          JSON.stringify({ status: 'ok', uptime: process.uptime(), version: '0.1.0', provider: 'binance', requestId: reqId }),
         );
       }
 
@@ -59,7 +63,7 @@ export function startHttpServer(provider: MarketDataProvider) {
         metrics.inc('http_requests_total', { route: 'symbols', method: 'GET' });
         const symbols = await withTiming('http_latency_seconds', () => provider.getSymbols());
         res.writeHead(200, { 'content-type': 'application/json' });
-        return void res.end(JSON.stringify({ symbols, updatedAt: Date.now() }));
+        return void res.end(JSON.stringify({ symbols, updatedAt: Date.now(), requestId: reqId }));
       }
 
       if (req.method === 'GET' && url.pathname === '/klines') {
@@ -69,9 +73,12 @@ export function startHttpServer(provider: MarketDataProvider) {
         const start = url.searchParams.get('start');
         const end = url.searchParams.get('end');
         const limit = url.searchParams.get('limit');
-        if (!symbol || !interval) {
+        try {
+          validateKlinesQuery({ symbol, interval, start: start ? +start : undefined, end: end ? +end : undefined, limit: limit ? +limit : undefined })
+        } catch (e) {
           res.writeHead(400, { 'content-type': 'application/json' });
-          return void res.end(JSON.stringify({ error: { code: 'missing_params', message: 'symbol and interval required' } }));
+          metrics.inc('http_requests_total', { route: 'klines', method: 'GET', status: '400' });
+          return void res.end(JSON.stringify({ error: mapError(e), requestId: reqId }));
         }
         const candles = await withTiming('http_latency_seconds', () => provider.getKlines({
           symbol,
@@ -81,7 +88,8 @@ export function startHttpServer(provider: MarketDataProvider) {
           limit: limit ? +limit : undefined,
         }));
         res.writeHead(200, { 'content-type': 'application/json' });
-        return void res.end(JSON.stringify({ candles }));
+        metrics.inc('http_requests_total', { route: 'klines', method: 'GET', status: '200' });
+        return void res.end(JSON.stringify({ candles, requestId: reqId }));
       }
 
       if (req.method === 'POST' && url.pathname === '/indicators') {
@@ -89,9 +97,12 @@ export function startHttpServer(provider: MarketDataProvider) {
         const chunks: Buffer[] = [];
         for await (const chunk of req) chunks.push(chunk as Buffer);
         const body = chunks.length ? JSON.parse(Buffer.concat(chunks).toString('utf8')) : {};
-        if (!body?.symbol || !body?.interval) {
+        try {
+          validateComputeRequest(body)
+        } catch (e) {
           res.writeHead(400, { 'content-type': 'application/json' });
-          return void res.end(JSON.stringify({ error: { code: 'invalid_compute_request', message: 'symbol and interval required' } }));
+          metrics.inc('http_requests_total', { route: 'indicators', method: 'POST', status: '400' });
+          return void res.end(JSON.stringify({ error: mapError(e), requestId: reqId }));
         }
         const candles = await withTiming('http_latency_seconds', () => provider.getKlines({
           symbol: body.symbol,
@@ -102,7 +113,8 @@ export function startHttpServer(provider: MarketDataProvider) {
         }));
         const out = buildSeries(body, candles);
         res.writeHead(200, { 'content-type': 'application/json' });
-        return void res.end(JSON.stringify(out));
+        metrics.inc('http_requests_total', { route: 'indicators', method: 'POST', status: '200' });
+        return void res.end(JSON.stringify({ ...out, requestId: reqId }));
       }
 
       if (req.method === 'GET' && url.pathname === '/stream/klines') {
@@ -111,7 +123,9 @@ export function startHttpServer(provider: MarketDataProvider) {
           'Content-Type': 'text/event-stream',
           'Cache-Control': 'no-cache',
           Connection: 'keep-alive',
+          'x-request-id': reqId,
         });
+        metrics.inc('http_streams_open_total', { route: 'stream_klines' });
         const symbol = url.searchParams.get('symbol') ?? 'BTCUSDT';
         const interval = url.searchParams.get('interval') ?? '1m';
         const indParam = url.searchParams.get('indicators');
@@ -126,6 +140,10 @@ export function startHttpServer(provider: MarketDataProvider) {
           ppo: wants.ppo ? new core.calculators.PpoCalc() : null,
           pvo: wants.pvo ? new core.calculators.PvoCalc() : null
         } as const;
+        const startedAt = Date.now();
+        const keepalive = setInterval(() => {
+          try { res.write(': keepalive\n\n'); } catch {}
+        }, 15000);
         const unsubscribe = provider.streamKlines({ symbol, interval, closedOnly: true }, (e) => {
           if (e.type === 'kline' && e.candle) {
             const { h, l, c, v } = { h: e.candle.h, l: e.candle.l, c: e.candle.c, v: e.candle.v };
@@ -137,12 +155,18 @@ export function startHttpServer(provider: MarketDataProvider) {
             if (calc.atr) { const a = calc.atr.update(h, l, c); deltas.atr = Number.isFinite(a) ? a : null; }
             if (calc.stoch) { const s = calc.stoch.update(h, l, c); deltas.stoch_k = Number.isFinite(s.k) ? s.k : null; deltas.stoch_d = Number.isFinite(s.d) ? s.d : null; }
             if (calc.vwap) { const w = calc.vwap.update(h, l, c, v); deltas.vwap = Number.isFinite(w) ? w : null; }
-            res.write(`data: ${JSON.stringify({ ...e, deltas })}\n\n`);
+            res.write(`data: ${JSON.stringify({ ...e, deltas, requestId: reqId })}\n\n`);
           } else {
-            res.write(`data: ${JSON.stringify(e)}\n\n`);
+            res.write(`data: ${JSON.stringify({ ...e, requestId: reqId })}\n\n`);
           }
         });
-        req.on('close', () => unsubscribe());
+        req.on('close', () => {
+          clearInterval(keepalive);
+          unsubscribe();
+          metrics.inc('http_streams_closed_total', { route: 'stream_klines' });
+          const seconds = Math.max(0, (Date.now() - startedAt) / 1000);
+          metrics.observe('http_stream_duration_seconds', seconds);
+        });
         return;
       }
 
@@ -153,11 +177,14 @@ export function startHttpServer(provider: MarketDataProvider) {
       }
 
       res.writeHead(404, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ error: 'not_found' }));
+      metrics.inc('http_requests_total', { route: 'not_found', method: req.method ?? 'GET', status: '404' });
+      res.end(JSON.stringify({ error: 'not_found', requestId: reqId }));
     } catch (err) {
-      logger.error('HTTP error', { err: (err instanceof Error ? err.message : String(err)) })
+      const reqId = res.getHeader('x-request-id') as string | undefined;
+      logger.error('HTTP error', { err: (err instanceof Error ? err.message : String(err)), requestId: reqId })
       res.writeHead(500, { 'content-type': 'application/json' });
-      res.end(JSON.stringify({ error: { code: 'internal_error', ...mapError(err) } }));
+      metrics.inc('http_requests_total', { route: 'internal_error', method: 'UNKNOWN', status: '500' });
+      res.end(JSON.stringify({ error: { code: 'internal_error', ...mapError(err) }, requestId: reqId }));
     }
   });
 

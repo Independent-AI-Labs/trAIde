@@ -4,6 +4,7 @@ import { sseUrl, useMcpBaseUrl } from '@/lib/mcp'
 import { useEffect, useRef, useState } from 'react'
 import { MiniChart } from '../charts/MiniChart'
 import { StatusPill } from '@/components/ui/StatusPill'
+import { useTickMs } from '@/lib/tickConfig'
 
 type KlineEvent = {
   type: 'kline'
@@ -18,7 +19,8 @@ export function HeroChartLive({ symbol = 'BTCUSDT', interval = '1m' }: { symbol?
   useMcpBaseUrl()
   // Proxy through same-origin to avoid CORS, the server route forwards to baseUrl
   const url = sseUrl(`/stream/klines?symbol=${symbol}&interval=${interval}&indicators=ppo,rsi`)
-  const { last, connected } = useSSE<KlineEvent>(url, true)
+  const tickMs = useTickMs()
+  const { last, connected } = useSSE<KlineEvent>(url, { enabled: true, throttleMs: tickMs })
   const [series, setSeries] = useState<{ t: number; c: number }[]>([])
   const lastTs = useRef<number>(0)
 
@@ -64,7 +66,7 @@ export function HeroChartLive({ symbol = 'BTCUSDT', interval = '1m' }: { symbol?
   return (
     <div className="relative">
       <div className="absolute right-3 top-3 z-10">
-        <StatusPill label={`${symbol} · ${interval}`} connected={connected} />
+        <StatusPill label={`${symbol} · ${interval}`} connected={connected} tickMs={tickMs} />
       </div>
       <MiniChart data={series} className="h-64 w-full rounded-xl" />
     </div>

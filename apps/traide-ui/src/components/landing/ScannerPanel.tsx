@@ -28,6 +28,9 @@ export function ScannerPanel() {
   const [minVol, setMinVol] = usePref<number>('scanner.minVol', 0)
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(false)
+  const [rules, setRules] = useState<Array<{ key: keyof Row; op: '>=' | '<=' | '>' | '<'; value: number }>>([
+    { key: 'changePct', op: '>=', value: -1000 },
+  ])
   const { fetchKlinesCached } = useFetchers()
   const tick = useTicker()
 
@@ -37,7 +40,7 @@ export function ScannerPanel() {
   useEffect(() => {
     let cancelled = false
     async function loadAll() {
-      setLoading(true)
+      setLoading((was) => (rows.length === 0 ? true : was))
       const res = await Promise.allSettled(
         group.symbols.map(async (sym) => {
           const cs = await fetchKlinesCached(sym, interval, lookback)
@@ -60,7 +63,20 @@ export function ScannerPanel() {
     loadAll(); return () => { cancelled = true }
   }, [groupId, interval, lookback, tick])
 
-  const filtered = useMemo(() => rows.filter((r) => r.vol >= minVol), [rows, minVol])
+  const filtered = useMemo(() => {
+    return rows.filter((r) => {
+      if (r.vol < minVol) return false
+      for (const rule of rules) {
+        const lhs = r[rule.key] as number
+        const rhs = rule.value
+        if (rule.op === '>=') { if (!(lhs >= rhs)) return false }
+        if (rule.op === '<=') { if (!(lhs <= rhs)) return false }
+        if (rule.op === '>') { if (!(lhs > rhs)) return false }
+        if (rule.op === '<') { if (!(lhs < rhs)) return false }
+      }
+      return true
+    })
+  }, [rows, minVol, rules])
   const cols: Column<Row>[] = [
     { key: 'symbol', label: 'Symbol' },
     { key: 'price', label: 'Price', align: 'right', render: (r) => fmt(r.price) },
@@ -82,13 +98,51 @@ export function ScannerPanel() {
         <Field label="Min Volume">
           <input type="number" className="w-28 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs text-white/90 outline-none" value={minVol} onChange={(e) => setMinVol(Number(e.target.value || 0))} />
         </Field>
-        {/** External sort controls removed; DataTable header handles sorting */}
+        <div className="flex w-full flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-white/60">Rules (AND):</span>
+            <button className="rounded bg-white/10 px-2 py-1 text-xs hover:bg-white/15" onClick={() => setRules(arr => [...arr, { key: 'changePct', op: '>=', value: 0 }])}>+ Rule</button>
+          </div>
+          <div className="flex flex-col gap-2">
+            {rules.map((r, i) => (
+              <div key={i} className="flex items-center justify-between gap-2 rounded-md border border-white/10 bg-white/5 p-2">
+                <div className="flex items-center gap-2">
+                  <span className="min-w-[1.5rem] text-center text-[11px] text-white/50">{i + 1}.</span>
+                  <select className="rounded bg-black/30 px-1 py-0.5 text-xs" value={r.key} onChange={(e) => setRules(arr => arr.map((it, idx) => idx === i ? { ...it, key: e.target.value as keyof Row } : it))}>
+                    <option value="changePct">Change%</option>
+                    <option value="rangePct">Range%</option>
+                    <option value="slope">Trend</option>
+                    <option value="price">Price</option>
+                    <option value="vol">Volume</option>
+                  </select>
+                  <select className="rounded bg-black/30 px-1 py-0.5 text-xs" value={r.op} onChange={(e) => setRules(arr => arr.map((it, idx) => idx === i ? { ...it, op: e.target.value as any } : it))}>
+                    <option value=">=">≥</option>
+                    <option value=">">&gt;</option>
+                    <option value="<=">≤</option>
+                    <option value="<">&lt;</option>
+                  </select>
+                  <input type="number" className="w-24 rounded bg-black/30 px-2 py-0.5 text-xs outline-none" value={r.value} onChange={(e) => setRules(arr => arr.map((it, idx) => idx === i ? { ...it, value: Number(e.target.value || 0) } : it))} />
+                </div>
+                <div className="flex items-center gap-1">
+                  <button className="rounded px-1 text-xs text-white/60 hover:bg-white/10 disabled:opacity-40" aria-label="Move up" title="Move up" disabled={i === 0} onClick={() => setRules(arr => { const copy = arr.slice(); const t = copy[i-1]; copy[i-1] = copy[i]; copy[i] = t!; return copy })}>↑</button>
+                  <button className="rounded px-1 text-xs text-white/60 hover:bg-white/10 disabled:opacity-40" aria-label="Move down" title="Move down" disabled={i === rules.length - 1} onClick={() => setRules(arr => { const copy = arr.slice(); const t = copy[i+1]; copy[i+1] = copy[i]; copy[i] = t!; return copy })}>↓</button>
+                  <button className="rounded px-1 text-xs text-white/60 hover:bg-white/10" aria-label="Remove rule" title="Remove" onClick={() => setRules(arr => arr.filter((_, idx) => idx !== i))}>×</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
-      {loading ? (
+      {rows.length === 0 && loading ? (
         <div className="rounded-xl border border-white/10 px-3 py-6 text-center text-white/60">Loading…</div>
       ) : (
-        <DataTable rows={filtered} columns={cols} defaultSort={{ key: 'changePct', desc: true }} />
+        <>
+          <DataTable rows={filtered} columns={cols} defaultSort={{ key: 'changePct', desc: true }} />
+          {loading && rows.length > 0 && (
+            <div className="pt-1 text-right text-xs text-white/50">Refreshing…</div>
+          )}
+        </>
       )}
     </div>
   )

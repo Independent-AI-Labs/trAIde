@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 export type SSEMessage<T> = { data: T }
-type Options = { enabled?: boolean; backoffBaseMs?: number; backoffMaxMs?: number; pauseWhenHidden?: boolean }
+type Options = { enabled?: boolean; backoffBaseMs?: number; backoffMaxMs?: number; pauseWhenHidden?: boolean; throttleMs?: number }
 
 export function useSSE<T = unknown>(url?: string, opts: boolean | Options = true) {
   const [last, setLast] = useState<T | null>(null)
@@ -16,6 +16,7 @@ export function useSSE<T = unknown>(url?: string, opts: boolean | Options = true
   const backoffBaseMs = typeof opts === 'boolean' ? 500 : (opts.backoffBaseMs ?? 500)
   const backoffMaxMs = typeof opts === 'boolean' ? 8000 : (opts.backoffMaxMs ?? 8000)
   const pauseWhenHidden = typeof opts === 'boolean' ? true : (opts.pauseWhenHidden ?? true)
+  const throttleMs = typeof opts === 'boolean' ? 0 : Math.max(0, Math.floor(opts.throttleMs ?? 0))
 
   useEffect(() => {
     if (!url || !enabled) return
@@ -35,10 +36,15 @@ export function useSSE<T = unknown>(url?: string, opts: boolean | Options = true
         const attempt = Math.min(backoffMaxMs, Math.floor(backoffBaseMs * Math.pow(2, retryRef.current++)))
         timerRef.current = window.setTimeout(open, attempt) as unknown as number
       }
+      const lastEmitRef = { t: 0 }
       es.onmessage = (ev) => {
         try {
           const payload = JSON.parse(ev.data)
-          setLast(payload as T)
+          const now = performance.now()
+          if (!throttleMs || now - lastEmitRef.t >= throttleMs) {
+            lastEmitRef.t = now
+            setLast(payload as T)
+          }
         } catch {}
       }
     }

@@ -1,11 +1,13 @@
 "use client"
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { sseUrl } from '@/lib/mcp'
+import { useTickMs } from '@/lib/tickConfig'
 
-export function StatusPill({ label, healthUrl = '/api/mcp/health', connected }: { label?: string; healthUrl?: string; connected?: boolean }) {
+export function StatusPill({ label, healthUrl = '/api/mcp/health', connected, tickMs: tickMsProp }: { label?: string; healthUrl?: string; connected?: boolean; tickMs?: number }) {
   const [latency, setLatency] = useState<number | null>(null)
   const [ok, setOk] = useState<boolean | null>(null)
   const timer = useRef<number | null>(null)
+  const tickMs = useTickMs(tickMsProp)
 
   useEffect(() => {
     let mounted = true
@@ -28,10 +30,10 @@ export function StatusPill({ label, healthUrl = '/api/mcp/health', connected }: 
       }
     }
     ping()
-    const id = window.setInterval(ping, 5000)
+    const id = window.setInterval(ping, Math.max(0, Math.round(tickMs)))
     timer.current = id as unknown as number
     return () => { if (timer.current) window.clearInterval(timer.current); mounted = false }
-  }, [healthUrl])
+  }, [healthUrl, tickMs])
 
   const status = useMemo(() => {
     if (connected === false) return 'RECONNECTING'

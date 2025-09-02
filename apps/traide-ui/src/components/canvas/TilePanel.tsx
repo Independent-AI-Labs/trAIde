@@ -43,7 +43,12 @@ export function TilePanel({ title, titleEditable, onTitleChange, onClose, onDrag
         <div className="flex items-center gap-2">
           {headerRight}
           {onClose && (
-            <button aria-label="Close panel" className="rounded-md px-2 py-1 text-white/70 hover:bg-white/10" onClick={onClose}>
+            <button
+              aria-label="Close panel"
+              className="rounded-md px-2 py-1 text-white/70 hover:bg-white/10"
+              onMouseDown={(e) => { e.stopPropagation() }}
+              onClick={(e) => { e.stopPropagation(); onClose() }}
+            >
               ✕
             </button>
           )}

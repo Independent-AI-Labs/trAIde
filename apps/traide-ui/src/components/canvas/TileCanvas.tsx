@@ -13,7 +13,9 @@ import dynamic from 'next/dynamic'
 import { RichTextPanel } from '@/components/panels/RichTextPanel'
 import { compactVertical, ensureNoOverlap, moveElement, autoArrange } from './engine'
 import { TickConfigProvider, TileConfigProvider } from '@/lib/tickConfig'
+import { loadLayouts as loadLayoutsStore, saveLayouts as saveLayoutsStore, DEFAULT_TILES_KEY, loadTiles as loadTilesStore } from '@/lib/layoutsStore'
 import { TickSelect } from '@/components/ui/TickSelect'
+import { ConfirmDialog, PromptDialog } from '@/components/ui/Modal'
 
 // lightweight chart wrapper used in landing; avoid SSR
 const OverlayChart = dynamic(() => import('@/components/charts/OverlayChart').then(m => m.OverlayChart), { ssr: false })
@@ -67,24 +69,7 @@ function titleFor(kind: TileKind): string {
 
 function nextId() { return Math.random().toString(36).slice(2, 9) }
 
-const DEFAULT_TILES_KEY = 'traide.tiles.v1'
-const DEFAULT_LAYOUTS_KEY = 'traide.layouts.v1'
-
-function loadLayouts(baseKey?: string): Record<string, Tile[]> {
-  if (typeof window === 'undefined') return {}
-  try {
-    const raw = window.localStorage.getItem(baseKey ? `${baseKey}.layouts` : DEFAULT_LAYOUTS_KEY)
-    if (!raw) return {}
-    const parsed = JSON.parse(raw)
-    if (parsed && typeof parsed === 'object') return parsed as Record<string, Tile[]>
-  } catch {}
-  return {}
-}
-
-function saveLayouts(obj: Record<string, Tile[]>, baseKey?: string) {
-  if (typeof window === 'undefined') return
-  try { window.localStorage.setItem(baseKey ? `${baseKey}.layouts` : DEFAULT_LAYOUTS_KEY, JSON.stringify(obj)) } catch {}
-}
+// Layout persistence via shared store helpers
 
 export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKey?: string; seed?: Tile[] }) {
   const [tiles, setTiles] = useState<Tile[]>([])
@@ -104,8 +89,10 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [layouts, setLayouts] = useState<Record<string, Tile[]>>({})
   const [savingName, setSavingName] = useState('')
-  const [layoutOpen, setLayoutOpen] = useState(false)
-  const [layoutAnchor, setLayoutAnchor] = useState<HTMLDivElement | null>(null)
+  const [confirmClose, setConfirmClose] = useState<null | { id: string; title: string }>(null)
+  const [confirmReset, setConfirmReset] = useState(false)
+  const [askSave, setAskSave] = useState(false)
+  // Unified menu now lives in FloatingHeader; TileCanvas only reacts to events
   const onContextMenu = useCallback((e: React.MouseEvent) => {
     // Ignore right-clicks originating from overlay UIs
     const target = e.target as HTMLElement
@@ -128,19 +115,13 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
   // Load persisted layout on mount
   useEffect(() => {
     if (typeof window === 'undefined') return
-    setLayouts(loadLayouts(storageKey))
+    // advertise current storage key for unified menu consumers
+    ;(window as any).__traide_layoutKey = storageKey || DEFAULT_TILES_KEY
+    setLayouts(loadLayoutsStore(storageKey))
     try {
-      const key = storageKey || DEFAULT_TILES_KEY
-      const raw = window.localStorage.getItem(key)
-      if (!raw) {
-        if (seed && seed.length) setTiles(seed)
-        return
-      }
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) {
-        const sane = parsed.filter((p) => p && typeof p.id === 'string' && typeof p.kind === 'string')
-        if (sane.length) setTiles(sane as Tile[])
-      }
+      const existing = loadTilesStore(storageKey)
+      if (existing && existing.length) setTiles(existing)
+      else if (seed && seed.length) setTiles(seed)
     } catch {}
     try {
       const lt = window.localStorage.getItem(`${storageKey}.tickMs`)
@@ -155,6 +136,19 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
     } catch {}
     
   }, [storageKey, seed])
+
+  // Ensure a default persisted 'Landing' layout exists for the landing page
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (storageKey === 'traide.landing.tiles.v1') {
+      const existingLayouts = loadLayoutsStore(storageKey)
+      if (!existingLayouts['Landing']) {
+        const next = { ...existingLayouts, Landing: tiles }
+        saveLayoutsStore(next, storageKey)
+        setLayouts(next)
+      }
+    }
+  }, [storageKey, tiles])
 
   // Persist layout on change
   useEffect(() => {
@@ -171,17 +165,41 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
   }, [panelTickMs, storageKey])
   
 
-  // Close layout menu on outside click
+  // Respond to unified menu commands
   useEffect(() => {
-    if (!layoutOpen) return
-    function onDown(e: MouseEvent) {
-      const el = layoutAnchor
-      if (!el) return
-      if (!el.contains(e.target as Node)) setLayoutOpen(false)
+    function applyLayout(ev: Event) {
+      const anyEv = ev as CustomEvent<{ tiles: Tile[] }>
+      const tilesNew = anyEv.detail?.tiles
+      if (Array.isArray(tilesNew)) setTiles(tilesNew)
     }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
-  }, [layoutOpen, layoutAnchor])
+    function setTick(ev: Event) {
+      const anyEv = ev as CustomEvent<{ ms: number }>
+      const ms = anyEv.detail?.ms; if (typeof ms === 'number') setLayoutTickMs(Math.max(0, ms))
+    }
+    function setPanelTick(ev: Event) {
+      const anyEv = ev as CustomEvent<{ kind: TileKind, ms?: number | null }>
+      const kind = anyEv.detail?.kind
+      const ms = anyEv.detail?.ms
+      if (!kind) return
+      setPanelTickMs((m) => {
+        const next = { ...m }
+        if (ms == null) delete (next as any)[kind]
+        else (next as any)[kind] = Math.max(0, ms)
+        return next
+      })
+    }
+    function resetPanelTick() { setPanelTickMs({}) }
+    window.addEventListener('traide:apply-layout' as any, applyLayout)
+    window.addEventListener('traide:set-layout-tick' as any, setTick)
+    window.addEventListener('traide:set-panel-tick' as any, setPanelTick)
+    window.addEventListener('traide:reset-panel-tick' as any, resetPanelTick)
+    return () => {
+      window.removeEventListener('traide:apply-layout' as any, applyLayout)
+      window.removeEventListener('traide:set-layout-tick' as any, setTick)
+      window.removeEventListener('traide:set-panel-tick' as any, setPanelTick)
+      window.removeEventListener('traide:reset-panel-tick' as any, resetPanelTick)
+    }
+  }, [])
 
   // Layout actions
   const saveCurrentAs = useCallback((name: string) => {
@@ -189,7 +207,7 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
     if (!n) return
     const next = { ...layouts, [n]: tiles }
     setLayouts(next)
-    saveLayouts(next, storageKey)
+    saveLayoutsStore(next, storageKey)
   }, [layouts, tiles, storageKey])
   const loadLayout = useCallback((name: string) => {
     const t = layouts[name]
@@ -199,18 +217,21 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
     const next = { ...layouts }
     delete next[name]
     setLayouts(next)
-    saveLayouts(next, storageKey)
+    saveLayoutsStore(next, storageKey)
   }, [layouts, storageKey])
-  // derive responsive columns (match md breakpoint)
-  useEffect(() => {
-    const mq = window.matchMedia('(min-width: 768px)')
-    const apply = () => setCols(mq.matches ? 2 : 1)
-    apply()
-    mq.addEventListener('change', apply)
-    return () => mq.removeEventListener('change', apply)
-  }, [])
-
   const [canvasW, setCanvasW] = useState(1)
+  // derive responsive columns from actual canvas width (full-bleed with min margin)
+  useEffect(() => {
+    const gap = 16 // px, must match metrics.gap
+    const minCol = 360 // px, minimum target column width for a single tile
+    const maxCols = 8
+    const next = Math.max(1, Math.min(maxCols, Math.floor((canvasW + gap) / (minCol + gap))))
+    if (next !== cols) {
+      setCols(next)
+      // Reflow layout within new column count while preserving order
+      setTiles((prev) => autoArrange(prev, undefined, next))
+    }
+  }, [canvasW, cols])
   useEffect(() => {
     const el = canvasRef.current
     if (!el) return
@@ -226,7 +247,7 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
   const metrics = useMemo(() => {
     const w = canvasW || 1
     const gap = 16 // matches gap-4
-    const colW = Math.max(1, (w - gap * (cols - 1)) / cols)
+    const colW = Math.max(1, (w - gap * Math.max(0, cols - 1)) / Math.max(1, cols))
     const rowH = 380
     return { colW, rowH, gap }
   }, [cols, canvasW])
@@ -495,7 +516,7 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
                 title={t.settings?.name ?? titleFor(t.kind)}
                 titleEditable
                 onTitleChange={(name) => setTiles((arr) => arr.map((it) => it.id === t.id ? { ...it, settings: { ...(it.settings || {}), name } } : it))}
-                onClose={() => closeTile(t.id)}
+                onClose={() => setConfirmClose({ id: t.id, title: t.settings?.name ?? titleFor(t.kind) })}
                 onDragStart={(e) => startDrag(t.id, e)}
                 headerRight={
                   <TickSelect
@@ -546,77 +567,41 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
         <ContextMenu x={menu.x} y={menu.y} onClose={() => setMenu(null)}>
           <MenuItem onClick={() => { setPaletteOpen(true) }}>New…</MenuItem>
           <MenuSep />
-          <MenuItem onClick={() => setTiles([])}>Reset Layout</MenuItem>
+          <MenuItem onClick={() => { setMenu(null); setConfirmReset(true) }}>Reset Layout…</MenuItem>
+          <MenuItem onClick={() => { setMenu(null); setAskSave(true) }}>Save As…</MenuItem>
         </ContextMenu>
       )}
+      <ConfirmDialog
+        open={!!confirmClose}
+        onClose={() => setConfirmClose(null)}
+        title="Close panel?"
+        message={<span>Close “{confirmClose?.title}” panel?</span>}
+        confirmLabel="Close"
+        onConfirm={() => { if (confirmClose) closeTile(confirmClose.id) }}
+      />
+      <ConfirmDialog
+        open={confirmReset}
+        onClose={() => setConfirmReset(false)}
+        title="Reset layout?"
+        message="Remove all panels from this layout?"
+        confirmLabel="Reset"
+        onConfirm={() => setTiles([])}
+      />
+      <PromptDialog
+        open={askSave}
+        onClose={() => setAskSave(false)}
+        title="Save Current Layout As…"
+        placeholder="Layout name"
+        confirmLabel="Save"
+        onSubmit={(name) => {
+          const next = { ...layouts, [name]: tiles }
+          setLayouts(next)
+          saveLayoutsStore(next, storageKey)
+        }}
+      />
       <ComponentPalette items={PANEL_REGISTRY} open={paletteOpen} onClose={() => setPaletteOpen(false)} onSelect={addTile} />
 
-      {/* Layout quick menu */}
-      <div className="pointer-events-none absolute left-3 top-3 z-20">
-        <div
-          className="pointer-events-auto inline-flex gap-2 rounded-xl border border-white/10 bg-white/10 p-2 backdrop-blur ui-overlay"
-          data-ui-overlay="1"
-          onContextMenu={(e) => { e.preventDefault(); e.stopPropagation() }}
-          ref={setLayoutAnchor}
-        >
-          <button className="rounded-lg bg-white/10 px-2 py-1 text-xs text-white/80 hover:bg-white/15" onClick={() => setLayoutOpen(v => !v)}>
-            Layouts
-          </button>
-          {layoutOpen && (
-            <div className="absolute mt-10 w-64 rounded-xl border border-white/10 bg-base-900/95 p-3 text-sm text-white/80 shadow-depth ui-overlay" data-ui-overlay="1">
-              <div className="mb-2 text-xs uppercase tracking-wide text-white/60">Saved Layouts</div>
-              <div className="max-h-48 space-y-1 overflow-auto">
-                {Object.keys(layouts).length === 0 && <div className="text-white/50">No saved layouts</div>}
-                {Object.entries(layouts).map(([name]) => (
-                  <div key={name} className="flex items-center justify-between gap-2 rounded-lg px-2 py-1 hover:bg-white/10">
-                    <button className="truncate" onClick={() => { loadLayout(name); setLayoutOpen(false) }}>{name}</button>
-                    <button aria-label="Delete layout" title="Delete" className="rounded p-1 text-white/50 hover:text-rose-300" onClick={() => deleteLayout(name)}>
-                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" className="h-4 w-4" aria-hidden>
-                        <path d="M9 3h6m-7 3h8m-8 0l-.8 13a2 2 0 0 0 2 2h5.6a2 2 0 0 0 2-2L16 6M10 10v7m4-7v7" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    </button>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-3 border-t border-white/10 pt-3">
-                <div className="mb-1 text-xs uppercase tracking-wide text-white/60">Layout Settings</div>
-                <label className="flex items-center justify-between gap-2 text-xs">
-                  <span>Tick</span>
-                  <TickSelect value={layoutTickMs} onChange={(v) => setLayoutTickMs(Math.max(0, v ?? 1000))} />
-                </label>
-                {kindsInUse.length > 0 && (
-                  <div className="mt-2 space-y-2">
-                    <div className="text-xs uppercase tracking-wide text-white/60">Per‑Panel Tick</div>
-                    {kindsInUse.map((kind) => (
-                      <label key={kind} className="flex items-center justify-between gap-2 text-xs">
-                        <span>{titleFor(kind)}</span>
-                        <TickSelect
-                          allowInherit
-                          inheritLabel="Layout"
-                          value={panelTickMs[kind]}
-                          onChange={(v) => setPanelTickMs((m) => {
-                            const next = { ...m }
-                            if (v == null) delete (next as any)[kind]
-                            else (next as any)[kind] = Math.max(0, v)
-                            return next
-                          })}
-                        />
-                      </label>
-                    ))}
-                    <div className="flex justify-end">
-                      <button className="rounded bg-white/10 px-2 py-1 text-xs hover:bg-white/15" onClick={() => setPanelTickMs({})}>Reset per‑panel</button>
-                    </div>
-                  </div>
-                )}
-              </div>
-              <div className="mt-3 flex items-center gap-2">
-                <input className="w-full rounded-lg border border-white/20 bg-base-800/80 px-2 py-1 text-xs text-white placeholder-white/50 outline-none focus:border-white/40 focus:ring-1 focus:ring-white/20" placeholder="Save as…" value={savingName} onChange={(e) => setSavingName(e.target.value)} />
-                <button className="rounded-lg bg-white/10 px-2 py-1 text-xs hover:bg-white/15" onClick={() => { saveCurrentAs(savingName); setSavingName('') }}>Save</button>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+      {/* Layout UI moved to unified menu overlay */}
 
       {/* Dragging feedback: live preview swaps via transform-based tiles */}
     </div>
