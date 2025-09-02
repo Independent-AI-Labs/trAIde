@@ -184,69 +184,34 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
     return () => mq.removeEventListener('change', apply)
   }, [])
 
-  const metrics = useMemo(() => {
+  const [canvasW, setCanvasW] = useState(1)
+  useEffect(() => {
     const el = canvasRef.current
-    const w = el?.clientWidth || 1
+    if (!el) return
+    const ro = new ResizeObserver((entries) => {
+      const cr = entries[0]?.contentRect
+      if (cr) setCanvasW(Math.max(1, Math.floor(cr.width)))
+    })
+    ro.observe(el)
+    setCanvasW(el.clientWidth || 1)
+    return () => ro.disconnect()
+  }, [canvasRef.current])
+
+  const metrics = useMemo(() => {
+    const w = canvasW || 1
     const gap = 16 // matches gap-4
     const colW = Math.max(1, (w - gap * (cols - 1)) / cols)
     const rowH = 380
     return { colW, rowH, gap }
-  }, [cols, canvasRef.current?.clientWidth])
+  }, [cols, canvasW])
 
   // basic collision check for target slot (kept for local drag targeting)
   const occupied = useCallback((id: string, x: number, y: number, w: number, h: number) => {
     return tiles.some(t => t.id !== id && !(x + w <= t.x || t.x + t.w <= x || y + h <= t.y || t.y + t.h <= y))
   }, [tiles])
 
-  // Auto-arrangement: compact vertically for multisize tiles (React-Grid-Layout style)
-  function autoArrange(afterMove: Tile[], movedId?: string): Tile[] {
-    const items = afterMove.map(t => ({ ...t }))
-    const moved = movedId ? items.find(t => t.id === movedId) : undefined
-    const byTopLeft = (a: Tile, b: Tile) => (a.y - b.y) || (a.x - b.x)
-    const occ: boolean[][] = []
-    const mark = (x: number, y: number, w: number, h: number, val: boolean) => {
-      for (let yy = y; yy < y + h; yy++) {
-        if (!occ[yy]) occ[yy] = Array(cols).fill(false)
-        for (let xx = x; xx < x + w; xx++) occ[yy][xx] = val
-      }
-    }
-    const fits = (x: number, y: number, w: number, h: number) => {
-      if (x < 0 || x + w > cols || y < 0) return false
-      for (let yy = y; yy < y + h; yy++) {
-        const row = occ[yy]
-        for (let xx = x; xx < x + w; xx++) {
-          if (row && row[xx]) return false
-        }
-      }
-      return true
-    }
-    const placeAt = (t: Tile, x: number, y: number) => { t.x = x; t.y = y; mark(x, y, t.w, t.h, true) }
-
-    const out: Tile[] = []
-    if (moved) {
-      moved.x = Math.max(0, Math.min(Math.max(0, cols - moved.w), moved.x))
-      moved.y = Math.max(0, moved.y)
-      let gy = moved.y
-      while (!fits(moved.x, gy, moved.w, moved.h)) gy++
-      placeAt(moved, moved.x, gy); out.push(moved)
-    }
-    const rest = items.filter(t => !moved || t.id !== moved.id).sort(byTopLeft)
-    for (const t of rest) {
-      let placed = false
-      for (let gy = 0; !placed; gy++) {
-        // prefer original column first
-        const startX = Math.max(0, Math.min(cols - t.w, t.x))
-        for (let gx = startX; gx <= cols - t.w; gx++) {
-          if (fits(gx, gy, t.w, t.h)) { placeAt(t, gx, gy); out.push(t); placed = true; break }
-        }
-        if (placed) break
-        for (let gx = 0; gx < startX; gx++) {
-          if (fits(gx, gy, t.w, t.h)) { placeAt(t, gx, gy); out.push(t); placed = true; break }
-        }
-      }
-    }
-    return out
-  }
+  // rAF-throttled live preview compute
+  const desiredRef = useRef<{ id: string; gx: number; gy: number } | null>(null)
 
   // keyboard movement for selected tile (arrow keys)
   const onKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -301,6 +266,9 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
       g.style.height = `${tile.h * (rowH + gap) - gap}px`
       el.appendChild(g)
       ghostRef.current = g
+      const left0 = tile.x * (colW + gap)
+      const top0 = tile.y * (rowH + gap)
+      g.style.transform = `translate(${left0}px, ${top0}px)`
     } catch {}
     const onMove = (ev: MouseEvent) => {
       const r = canvasRef.current?.getBoundingClientRect(); if (!r) return
@@ -327,11 +295,17 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
         ghostRef.current.style.transform = `translate(${left}px, ${top}px)`
       }
 
-      // Stable live preview: arrange with the dragged tile pinned first
-      const placed = tiles.map(t => t.id === tileNow.id ? { ...t, x: gx, y: gy } : t)
-      const arranged = autoArrange(placed, tileNow.id)
-      if (previewRaf.current != null) cancelAnimationFrame(previewRaf.current)
-      previewRaf.current = requestAnimationFrame(() => setPreview(arranged))
+      // rAF-throttled arrangement
+      desiredRef.current = { id: tileNow.id, gx, gy }
+      if (previewRaf.current == null) {
+        previewRaf.current = requestAnimationFrame(() => {
+          const d = desiredRef.current; previewRaf.current = null
+          if (!d) return
+          const placed = tiles.map(t => t.id === d.id ? { ...t, x: d.gx, y: d.gy } : t)
+          const arranged = autoArrange(placed, d.id, cols)
+          setPreview(arranged)
+        })
+      }
     }
     const onUp = () => {
       window.removeEventListener('mousemove', onMove)
@@ -355,8 +329,21 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
     if (!resize) return
     const onMove = (e: MouseEvent) => {
       e.preventDefault()
-      // No heavy work here; ghost dragging is imperative, only resize needs a tick
-      setResize(r => (r ? { ...r } : r))
+      const el = canvasRef.current
+      if (!el) return
+      const rect = el.getBoundingClientRect()
+      const px = e.clientX - rect.left
+      const py = e.clientY - rect.top
+      const { colW, rowH, gap } = metrics
+      const tile = tiles.find(t => t.id === resize.id)
+      if (!tile) return
+      let gw = Math.max(1, Math.min(cols - tile.x, Math.round((px - tile.x * (colW + gap)) / (colW + gap))))
+      let gh = Math.max(1, Math.round((py - tile.y * (rowH + gap)) / (rowH + gap)))
+      const copy = tiles.map(t => t.id === tile.id ? { ...t, w: gw, h: gh } : t)
+      const noOverlap = ensureNoOverlap(copy, tile.id)
+      const compacted = compactVertical(noOverlap, cols)
+      setPreview(compacted)
+      setResize(r => (r ? { ...r, w: gw, h: gh } : r))
     }
     const onUp = (e: MouseEvent) => {
       if (resize) {
@@ -379,6 +366,7 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
         }
       }
       setResize(null)
+      setPreview(null)
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp, { once: true })

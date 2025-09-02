@@ -24,7 +24,7 @@ export function DataTable<T extends { [k: string]: any }>({ rows, columns, defau
           <thead className="bg-white/5 text-white/70" role="rowgroup">
             <tr>
               {columns.map((c) => (
-                <th key={String(c.key)} className={`px-3 py-2 font-medium ${c.align === 'right' ? 'text-right' : 'text-left'}`} aria-sort={sortKey === c.key ? (desc ? 'descending' : 'ascending') : 'none'}>
+                <th key={String(c.key)} scope="col" className={`px-3 py-2 font-medium ${c.align === 'right' ? 'text-right' : 'text-left'}`} aria-sort={sortKey === c.key ? (desc ? 'descending' : 'ascending') : 'none'}>
                   <button className="inline-flex items-center gap-1" onClick={() => { if (sortKey === c.key) setDesc(!desc); else { setSortKey(c.key); setDesc(true) } }} aria-label={`Sort by ${c.label}`}>
                     <span>{c.label}</span>
                     {sortKey === c.key ? <span className="text-xs">{desc ? '↓' : '↑'}</span> : null}
