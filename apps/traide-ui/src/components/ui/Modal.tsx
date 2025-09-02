@@ -29,8 +29,16 @@ export function Modal({ open, onClose, title, children, buttons = [] }: { open: 
 
   if (!open) return null
   const body = (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm ui-overlay" onContextMenu={(e) => { e.preventDefault(); e.stopPropagation() }}>
-      <div ref={ref} className="w-[min(92vw,520px)] rounded-xl border border-white/10 bg-base-900/90 p-4 text-sm text-white shadow-2xl">
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm ui-overlay"
+      onContextMenu={(e) => { e.preventDefault(); e.stopPropagation() }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+    >
+      <div
+        ref={ref}
+        className="relative z-10 w-[min(92vw,520px)] rounded-xl border border-white/10 bg-base-900/90 p-4 text-sm text-white shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
         {title && <div className="mb-3 text-base font-medium text-white/90">{title}</div>}
         {children && <div className="mb-4 text-white/80">{children}</div>}
         {buttons.length > 0 && (
@@ -57,7 +65,6 @@ export function Modal({ open, onClose, title, children, buttons = [] }: { open: 
           </div>
         )}
       </div>
-      <button aria-label="Close" className="absolute inset-0 cursor-default" onClick={onClose} />
     </div>
   )
   return createPortal(body, document.body)
