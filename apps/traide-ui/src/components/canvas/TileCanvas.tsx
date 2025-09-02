@@ -334,6 +334,12 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
       dragRef.current = null
       if (previewRaf.current != null) { cancelAnimationFrame(previewRaf.current); previewRaf.current = null }
       if (preview) setTiles(preview)
+      else if (desiredRef.current) {
+        const d = desiredRef.current
+        const placed = tiles.map(t => t.id === d.id ? { ...t, x: d.gx, y: d.gy } : t)
+        const arranged = autoArrange(placed, d.id, cols)
+        setTiles(arranged)
+      }
       setPreview(null)
       // remove overlays
       if (ghostRef.current) {
