@@ -10,7 +10,7 @@ import { IndicatorPicker, type IndicatorOverlay } from '@/components/ui/Indicato
 const OverlayChart = dynamic(() => import('@/components/charts/OverlayChart').then(m => m.OverlayChart), { ssr: false })
 
 export function ChartModal() {
-  const { chart, closeChart, openChart } = useModals()
+  const { chart, closeChart, openChart, openTicker } = useModals()
   if (!chart.open) return null
   const [tf, setTf] = useState(chart.tf)
   const [pickerOpen, setPickerOpen] = useState(false)
@@ -19,7 +19,6 @@ export function ChartModal() {
   useEffect(() => { if (chart.open) setTf(chart.tf) }, [chart.open, chart.tf])
 
   const { data } = useKlines({ symbol: chart.symbol, interval: tf, limit: 300, stream: chart.open })
-  const { openTicker } = require('@/lib/ui/modals') as typeof import('@/lib/ui/modals')
   const title = useMemo(() => (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
