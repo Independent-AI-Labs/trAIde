@@ -91,6 +91,7 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [cols, setCols] = useState<number>(1)
   const [layoutTickMs, setLayoutTickMs] = useState<number>(1000)
+  const [panelTickMs, setPanelTickMs] = useState<Partial<Record<TileKind, number>>>({})
   const canvasRef = useRef<HTMLDivElement | null>(null)
   // Fast drag preview using an imperative ghost overlay (no per-frame React updates)
   const dragRef = useRef<null | { id: string; dx: number; dy: number; w: number; h: number; fromX: number; fromY: number }>(null)
@@ -210,7 +211,6 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
   }, [])
 
   const [canvasW, setCanvasW] = useState(1)
-  const [panelTickMs, setPanelTickMs] = useState<Partial<Record<TileKind, number>>>({})
   useEffect(() => {
     const el = canvasRef.current
     if (!el) return
