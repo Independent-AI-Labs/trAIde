@@ -23,8 +23,8 @@ export function DataTable<T extends { [k: string]: any }>({ rows, columns, defau
         <table className="w-full text-sm" role="table">
           <thead className="bg-white/5 text-white/70" role="rowgroup">
             <tr>
-              {columns.map((c) => (
-                <th key={String(c.key)} scope="col" className={`px-3 py-2 font-medium ${c.align === 'right' ? 'text-right' : 'text-left'}`} aria-sort={sortKey === c.key ? (desc ? 'descending' : 'ascending') : 'none'}>
+              {columns.map((c, i) => (
+                <th key={`${String(c.key)}:${i}`} scope="col" className={`px-3 py-2 font-medium ${c.align === 'right' ? 'text-right' : 'text-left'}`} aria-sort={sortKey === c.key ? (desc ? 'descending' : 'ascending') : 'none'}>
                   <button className="inline-flex items-center gap-1" onClick={() => { if (sortKey === c.key) setDesc(!desc); else { setSortKey(c.key); setDesc(true) } }} aria-label={`Sort by ${c.label}`}>
                     <span>{c.label}</span>
                     {sortKey === c.key ? <span className="text-xs">{desc ? '↓' : '↑'}</span> : null}
@@ -36,8 +36,8 @@ export function DataTable<T extends { [k: string]: any }>({ rows, columns, defau
           <tbody role="rowgroup">
             {sorted.map((r, idx) => (
               <tr key={idx} className="border-t border-white/10 hover:bg-white/5">
-                {columns.map((c) => (
-                  <td key={String(c.key)} className={`px-3 py-2 ${c.align === 'right' ? 'text-right' : 'text-left'}`}>
+                {columns.map((c, i) => (
+                  <td key={`${String(c.key)}:${i}`} className={`px-3 py-2 ${c.align === 'right' ? 'text-right' : 'text-left'}`}>
                     {c.render ? c.render(r) : String(r[c.key])}
                   </td>
                 ))}
