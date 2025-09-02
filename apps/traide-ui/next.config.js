@@ -5,12 +5,19 @@ const nextConfig = {
   },
   reactStrictMode: true,
   async headers() {
+    const isProd = process.env.NODE_ENV === 'production'
+    const scriptSrc = isProd
+      ? "script-src 'self'"
+      : "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+    const connectSrc = isProd
+      ? "connect-src 'self' http: https:"
+      : "connect-src 'self' http: https: ws: wss:"
     const csp = [
       "default-src 'self'",
       "img-src 'self' data:",
       "style-src 'self' 'unsafe-inline'",
-      "script-src 'self'",
-      "connect-src 'self' http: https:",
+      scriptSrc,
+      connectSrc,
       "font-src 'self' data:",
       "frame-ancestors 'none'",
       "base-uri 'self'",
