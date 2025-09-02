@@ -5,6 +5,8 @@ import { NetConfigProvider } from '@/lib/net/config'
 import { MarketCacheProvider } from '@/lib/data/market-cache'
 import { ToastProvider } from '@/components/ui/Toast'
 import { FloatingHeader } from '@/components/ui/FloatingHeader'
+import { UIOverlayProvider } from '@/lib/ui/modals'
+import { GlobalModalsHost } from '@/components/ui/GlobalModalsHost'
 
 export const metadata = {
   title: 'Traide — Technical Analysis Platform',
@@ -19,14 +21,17 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <NetConfigProvider>
           <MarketCacheProvider>
             <ToastProvider>
-              <main className="relative min-h-screen">
-                <div className="pointer-events-none absolute inset-0 holo-ring opacity-20 blur-3xl" />
-                <FloatingHeader />
-                {children}
-              </main>
+              <UIOverlayProvider>
+                <main className="relative min-h-screen">
+                  <div className="pointer-events-none absolute inset-0 holo-ring opacity-20 blur-3xl" />
+                  <FloatingHeader />
+                  {children}
+                </main>
+                <GlobalModalsHost />
+              </UIOverlayProvider>
             </ToastProvider>
           </MarketCacheProvider>
-                  </NetConfigProvider>
+          </NetConfigProvider>
         </MCPConfigProvider>
       </body>
     </html>

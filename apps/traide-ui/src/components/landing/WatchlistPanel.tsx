@@ -4,6 +4,7 @@ import { MiniChart } from '@/components/charts/MiniChart'
 import { useSSE } from '@/lib/useSSE'
 import { sseUrl, useMcpBaseUrl } from '@/lib/mcp'
 import { useTickMs } from '@/lib/tickConfig'
+import { useModals } from '@/lib/ui/modals'
 
 type KEvent = { type: 'kline'; candle?: { t: number; c: number } }
 
@@ -27,6 +28,7 @@ function WatchItem({ symbol, interval }: { symbol: string; interval: string }) {
   const [series, setSeries] = useState<{ t: number; c: number }[]>([])
   const [base, setBase] = useState<number | null>(null)
   const lastTs = useRef(0)
+  const { openChart } = useModals()
 
   useEffect(() => {
     let cancelled = false
@@ -60,7 +62,7 @@ function WatchItem({ symbol, interval }: { symbol: string; interval: string }) {
   }, [price, base])
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/5 p-3 backdrop-blur">
+    <button onClick={() => openChart(symbol)} className="rounded-2xl border border-white/10 bg-white/5 p-3 text-left backdrop-blur hover:bg-white/10">
       <div className="mb-2 flex items-center justify-between text-sm">
         <div className="font-medium text-white/90">{symbol}</div>
         <div className="flex items-center gap-2">
@@ -71,6 +73,6 @@ function WatchItem({ symbol, interval }: { symbol: string; interval: string }) {
         </div>
       </div>
       <MiniChart data={series} className="h-28 w-full rounded-xl" />
-    </div>
+    </button>
   )
 }
