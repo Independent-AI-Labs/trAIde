@@ -1,9 +1,10 @@
 "use client"
 import { useState } from 'react'
+import { Field } from './Field'
 
-export function SymbolInput({ value, onChange, onEnter, placeholder = 'SYMBOL', className }: { value: string; onChange: (v: string) => void; onEnter?: () => void; placeholder?: string; className?: string }) {
+export function SymbolInput({ value, onChange, onEnter, placeholder = 'SYMBOL', className, label }: { value: string; onChange: (v: string) => void; onEnter?: () => void; placeholder?: string; className?: string; label?: string }) {
   const [val, setVal] = useState(value)
-  return (
+  const input = (
     <input
       className={className || 'w-40 rounded-xl border border-white/15 bg-white/5 px-3 py-1.5 text-sm uppercase tracking-wide text-white placeholder-white/50 outline-none focus:border-white/30'}
       value={val}
@@ -12,5 +13,5 @@ export function SymbolInput({ value, onChange, onEnter, placeholder = 'SYMBOL', 
       onKeyDown={(e) => { if (e.key === 'Enter') onEnter?.() }}
     />
   )
+  return label ? <Field label={label}>{input}</Field> : input
 }
-

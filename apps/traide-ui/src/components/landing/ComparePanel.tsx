@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 const MultiLineChart = dynamic(() => import('@/components/charts/MultiLineChart').then(m => m.MultiLineChart), { ssr: false })
 import { IntervalSelect } from '@/components/ui/IntervalSelect'
+import { Field } from '@/components/ui/Field'
 import { useFetchers } from '@/lib/data/fetchers'
 import { usePref } from '@/lib/prefs'
 import { useIdlePrefetch } from '@/lib/data/prefetch'
@@ -41,18 +42,19 @@ export function ComparePanel() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between text-sm">
-        <div className="flex items-center gap-2">
+      <div className="flex items-start justify-between text-sm">
+        <div className="flex items-start gap-3">
           {symbols.map((s, i) => (
-            <input
-              key={i}
-              className="w-28 rounded-xl border border-white/15 bg-white/5 px-2 py-1 text-xs uppercase text-white/80 outline-none"
-              value={s}
-              onChange={(e) => setSymbols((arr) => arr.map((v, idx) => (idx === i ? e.target.value.toUpperCase() : v)))}
-            />
+            <Field key={i} label={`Symbol ${i + 1}`}>
+              <input
+                className="w-28 rounded-xl border border-white/15 bg-white/5 px-2 py-1 text-xs uppercase text-white/80 outline-none"
+                value={s}
+                onChange={(e) => setSymbols((arr) => arr.map((v, idx) => (idx === i ? e.target.value.toUpperCase() : v)))}
+              />
+            </Field>
           ))}
         </div>
-        <IntervalSelect value={interval} onChange={setInterval} />
+        <IntervalSelect label="Interval" value={interval} onChange={setInterval} />
       </div>
       <MultiLineChart series={series} className="h-60 w-full rounded-xl" />
     </div>

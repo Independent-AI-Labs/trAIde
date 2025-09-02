@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { GroupSelect } from '@/components/ui/GroupSelect'
 import { IntervalSelect } from '@/components/ui/IntervalSelect'
+import { Field } from '@/components/ui/Field'
 import { getGroup } from '@/lib/symbols'
 import { useFetchers } from '@/lib/data/fetchers'
 import { usePref } from '@/lib/prefs'
@@ -72,15 +73,15 @@ export function ScannerPanel() {
 
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap items-center gap-2 text-sm">
-        <GroupSelect value={groupId} onChange={setGroupId} />
-        <IntervalSelect value={interval} onChange={setInterval} />
-        <label className="ml-2 text-white/70">Lookback
-          <input type="number" className="ml-2 w-20 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs text-white/90 outline-none" value={lookback} onChange={(e) => setLookback(Number(e.target.value || 0))} />
-        </label>
-        <label className="ml-2 text-white/70">Min Vol
-          <input type="number" className="ml-2 w-28 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs text-white/90 outline-none" value={minVol} onChange={(e) => setMinVol(Number(e.target.value || 0))} />
-        </label>
+      <div className="flex flex-wrap items-start gap-3 text-sm">
+        <GroupSelect label="Group" value={groupId} onChange={setGroupId} />
+        <IntervalSelect label="Interval" value={interval} onChange={setInterval} />
+        <Field label="Lookback">
+          <input type="number" className="w-20 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs text-white/90 outline-none" value={lookback} onChange={(e) => setLookback(Number(e.target.value || 0))} />
+        </Field>
+        <Field label="Min Volume">
+          <input type="number" className="w-28 rounded-lg border border-white/15 bg-white/5 px-2 py-1 text-xs text-white/90 outline-none" value={minVol} onChange={(e) => setMinVol(Number(e.target.value || 0))} />
+        </Field>
         {/** External sort controls removed; DataTable header handles sorting */}
       </div>
 

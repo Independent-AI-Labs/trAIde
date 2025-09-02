@@ -499,6 +499,8 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
                 onDragStart={(e) => startDrag(t.id, e)}
                 headerRight={
                   <TickSelect
+                    label="Tick"
+                    dense
                     allowInherit
                     value={t.settings?.tickMs}
                     onChange={(ms) => setTiles((arr) => arr.map((it) => it.id === t.id ? { ...it, settings: { ...(it.settings || {}), tickMs: ms } } : it))}

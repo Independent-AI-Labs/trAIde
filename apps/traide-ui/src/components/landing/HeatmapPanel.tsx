@@ -2,6 +2,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { getGroup } from '@/lib/symbols'
 import { IntervalSelect } from '@/components/ui/IntervalSelect'
+import { GroupSelect } from '@/components/ui/GroupSelect'
 import { useFetchers } from '@/lib/data/fetchers'
 import { usePref } from '@/lib/prefs'
 import { useIdlePrefetch } from '@/lib/data/prefetch'
@@ -40,13 +41,11 @@ export function HeatmapPanel() {
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between text-sm">
-        <select className="rounded-xl border border-white/20 bg-base-800/90 px-2 py-1 text-xs text-white shadow-sm focus:outline-none focus:ring-1 focus:ring-white/30" value={groupId} onChange={(e) => setGroupId(e.target.value)}>
-          <option value="majors" className="bg-neutral-900">Majors</option>
-          <option value="l1" className="bg-neutral-900">Layer 1</option>
-          <option value="defi" className="bg-neutral-900">DeFi</option>
-        </select>
-        <IntervalSelect value={interval} onChange={setInterval} />
+      <div className="flex items-start justify-between gap-3 text-sm">
+        <div className="flex items-start gap-3">
+          <GroupSelect label="Group" value={groupId} onChange={setGroupId} />
+          <IntervalSelect label="Interval" value={interval} onChange={setInterval} />
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {rows.map((r) => (

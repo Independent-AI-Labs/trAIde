@@ -1,5 +1,6 @@
 "use client"
 import React from 'react'
+import { Field } from './Field'
 
 type Props = {
   value?: number
@@ -8,12 +9,14 @@ type Props = {
   inheritLabel?: string
   className?: string
   title?: string
+  label?: string
+  dense?: boolean
 }
 
 const PRESETS = [100, 250, 500, 1000, 2000]
 
-export function TickSelect({ value, onChange, allowInherit = false, inheritLabel = 'Inherit', className, title = 'Tick' }: Props) {
-  return (
+export function TickSelect({ value, onChange, allowInherit = false, inheritLabel = 'Inherit', className, title = 'Tick', label, dense }: Props) {
+  const select = (
     <select
       title={title}
       className={
@@ -32,10 +35,10 @@ export function TickSelect({ value, onChange, allowInherit = false, inheritLabel
       ))}
     </select>
   )
+  return label ? <Field label={label} dense={dense}>{select}</Field> : select
 }
 
 function formatMs(ms: number) {
   if (ms < 1000) return `${ms/1000}s`
   return `${Math.round(ms/1000)}s`
 }
-
