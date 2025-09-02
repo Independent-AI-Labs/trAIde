@@ -17,7 +17,7 @@ export function FloatingHeader() {
           <div className="text-sm font-semibold text-white/90">trAIde — Live Technical Analysis</div>
         </div>
         <div className="flex items-center gap-2">
-          <button className="rounded-lg bg-white/10 px-3 py-1.5 text-sm text-white/90 hover:bg-white/15" onClick={openTicker}>Ticker…</button>
+          <button className="rounded-lg bg-white/10 px-3 py-1.5 text-sm text-white/90 hover:bg-white/15" onClick={() => openTicker()}>Ticker…</button>
           <LayoutsButton />
           <EndpointControl />
         </div>

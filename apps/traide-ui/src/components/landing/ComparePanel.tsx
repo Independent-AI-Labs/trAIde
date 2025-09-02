@@ -49,11 +49,15 @@ export function ComparePanel() {
         <div className="flex items-start gap-3">
           {symbols.map((s, i) => (
             <Field key={i} label={`Symbol ${i + 1}`}>
-              <input
-                className="w-28 rounded-xl border border-white/15 bg-white/5 px-2 py-1 text-xs uppercase text-white/80 outline-none"
-                value={s}
-                onChange={(e) => setSymbols((arr) => arr.map((v, idx) => (idx === i ? e.target.value.toUpperCase() : v)))}
-              />
+              <button
+                className="w-28 rounded-xl border border-white/15 bg-white/5 px-2 py-1 text-xs uppercase text-white/80 outline-none hover:bg-white/10"
+                onClick={() => {
+                  const { openTicker } = require('@/lib/ui/modals') as typeof import('@/lib/ui/modals')
+                  openTicker((sym) => setSymbols((arr) => arr.map((v, idx) => (idx === i ? sym : v))))
+                }}
+              >
+                {s}
+              </button>
             </Field>
           ))}
         </div>

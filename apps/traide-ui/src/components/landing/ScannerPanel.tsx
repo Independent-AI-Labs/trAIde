@@ -87,7 +87,18 @@ export function ScannerPanel() {
     { key: 'rangePct', label: 'Range%', align: 'right', render: (r) => <span className={r.rangePct >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{r.rangePct.toFixed(2)}%</span> },
     { key: 'vol', label: 'Volume', align: 'right', render: (r) => fmt(r.vol) },
     { key: 'slope', label: 'Trend', align: 'right', render: (r) => <span className={r.slope >= 0 ? 'text-emerald-300' : 'text-rose-300'}>{r.slope.toFixed(4)}</span> },
-    { key: 'symbol', label: 'Open', align: 'right', render: (r) => <a className="rounded-lg bg-white/5 px-2 py-1" href={`/app/chart/${r.symbol}`}>Chart</a> },
+    { key: 'symbol', label: 'Open', align: 'right', render: (r) => (
+      <button
+        className="rounded-lg bg-white/5 px-2 py-1 hover:bg-white/10"
+        onClick={() => {
+          const { openTicker, openChart } = require('@/lib/ui/modals') as typeof import('@/lib/ui/modals')
+          // If user wants a different symbol, allow change; otherwise open current
+          openTicker((sym) => openChart(sym))
+        }}
+      >
+        Chart…
+      </button>
+    ) },
   ]
 
   return (

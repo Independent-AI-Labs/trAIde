@@ -19,6 +19,7 @@ export function ChartModal() {
   useEffect(() => { if (chart.open) setTf(chart.tf) }, [chart.open, chart.tf])
 
   const { data } = useKlines({ symbol: chart.symbol, interval: tf, limit: 300, stream: chart.open })
+  const { openTicker } = require('@/lib/ui/modals') as typeof import('@/lib/ui/modals')
   const title = useMemo(() => (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
@@ -26,6 +27,7 @@ export function ChartModal() {
         <TimeframeSwitch value={tf} onChange={setTf} />
       </div>
       <div className="flex items-center gap-2">
+        <button className="rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/15" onClick={() => openTicker((s) => openChart(s, tf))}>Change…</button>
         <button className="rounded-lg bg-white/10 px-3 py-1.5 text-sm hover:bg-white/15" onClick={() => setPickerOpen(true)}>Indicators…</button>
       </div>
     </div>
