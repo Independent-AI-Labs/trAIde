@@ -11,7 +11,9 @@ import { ComparePanel } from '@/components/landing/ComparePanel'
 import { HeatmapPanel } from '@/components/landing/HeatmapPanel'
 import dynamic from 'next/dynamic'
 import { RichTextPanel } from '@/components/panels/RichTextPanel'
-import { compactVertical, ensureNoOverlap, moveElement } from './engine'
+import { compactVertical, ensureNoOverlap, moveElement, autoArrange } from './engine'
+import { TickConfigProvider, TileConfigProvider } from '@/lib/tickConfig'
+import { TickSelect } from '@/components/ui/TickSelect'
 
 // lightweight chart wrapper used in landing; avoid SSR
 const OverlayChart = dynamic(() => import('@/components/charts/OverlayChart').then(m => m.OverlayChart), { ssr: false })
@@ -88,6 +90,7 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
   const [tiles, setTiles] = useState<Tile[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [cols, setCols] = useState<number>(1)
+  const [layoutTickMs, setLayoutTickMs] = useState<number>(1000)
   const canvasRef = useRef<HTMLDivElement | null>(null)
   // Fast drag preview using an imperative ghost overlay (no per-frame React updates)
   const dragRef = useRef<null | { id: string; dx: number; dy: number; w: number; h: number; fromX: number; fromY: number }>(null)
@@ -138,6 +141,18 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
         if (sane.length) setTiles(sane as Tile[])
       }
     } catch {}
+    try {
+      const lt = window.localStorage.getItem(`${storageKey}.tickMs`)
+      if (lt != null) setLayoutTickMs(Math.max(0, Number(lt)))
+    } catch {}
+    try {
+      const raw = window.localStorage.getItem(`${storageKey}.panelTickMs`)
+      if (raw) {
+        const parsed = JSON.parse(raw)
+        if (parsed && typeof parsed === 'object') setPanelTickMs(parsed as Partial<Record<TileKind, number>>)
+      }
+    } catch {}
+    
   }, [storageKey, seed])
 
   // Persist layout on change
@@ -145,6 +160,15 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
     if (typeof window === 'undefined') return
     try { window.localStorage.setItem(storageKey || DEFAULT_TILES_KEY, JSON.stringify(tiles)) } catch {}
   }, [tiles, storageKey])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try { window.localStorage.setItem(`${storageKey}.tickMs`, String(layoutTickMs)) } catch {}
+  }, [layoutTickMs, storageKey])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try { window.localStorage.setItem(`${storageKey}.panelTickMs`, JSON.stringify(panelTickMs)) } catch {}
+  }, [panelTickMs, storageKey])
+  
 
   // Close layout menu on outside click
   useEffect(() => {
@@ -186,6 +210,7 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
   }, [])
 
   const [canvasW, setCanvasW] = useState(1)
+  const [panelTickMs, setPanelTickMs] = useState<Partial<Record<TileKind, number>>>({})
   useEffect(() => {
     const el = canvasRef.current
     if (!el) return
@@ -401,6 +426,12 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
         const el = canvasRef.current
         if (el) {
           if (preview) setTiles(preview)
+          else {
+            const { id, x, y, w, h } = resize
+            const copy = tiles.map(t => t.id === id ? { ...t, x, y, w, h } : t)
+            const arranged = compactVertical(ensureNoOverlap(copy, id), cols)
+            setTiles(arranged)
+          }
         }
       }
       setResize(null)
@@ -425,7 +456,10 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
     return Math.max(maxBottom, 1)
   }, [renderTiles, metrics])
 
+  const kindsInUse = useMemo(() => Array.from(new Set(tiles.map(t => t.kind))), [tiles])
+
   return (
+    <TickConfigProvider defaults={{ tickMs: 1000 }} layout={{ tickMs: layoutTickMs, panelTickMs }}>
     <div
       className="relative h-[calc(100vh-120px)] w-full select-none"
       onContextMenu={onContextMenu}
@@ -457,8 +491,21 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
               }}
               onMouseDown={(e) => { e.stopPropagation(); setSelectedId(t.id) }}
             >
-              <TilePanel title={titleFor(t.kind)} onClose={() => closeTile(t.id)} onDragStart={(e) => startDrag(t.id, e)}>
-                {renderTileContent(t.kind, t.id)}
+              <TilePanel
+                title={titleFor(t.kind)}
+                onClose={() => closeTile(t.id)}
+                onDragStart={(e) => startDrag(t.id, e)}
+                headerRight={
+                  <TickSelect
+                    allowInherit
+                    value={t.settings?.tickMs}
+                    onChange={(ms) => setTiles((arr) => arr.map((it) => it.id === t.id ? { ...it, settings: { ...(it.settings || {}), tickMs: ms } } : it))}
+                  />
+                }
+              >
+                <TileConfigProvider tile={t}>
+                  {renderTileContent(t.kind, t.id)}
+                </TileConfigProvider>
               </TilePanel>
               {/* Resize handles: N, S, E, W, SE */}
               <div
@@ -527,6 +574,37 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
                   </div>
                 ))}
               </div>
+              <div className="mt-3 border-t border-white/10 pt-3">
+                <div className="mb-1 text-xs uppercase tracking-wide text-white/60">Layout Settings</div>
+                <label className="flex items-center justify-between gap-2 text-xs">
+                  <span>Tick</span>
+                  <TickSelect value={layoutTickMs} onChange={(v) => setLayoutTickMs(Math.max(0, v ?? 1000))} />
+                </label>
+                {kindsInUse.length > 0 && (
+                  <div className="mt-2 space-y-2">
+                    <div className="text-xs uppercase tracking-wide text-white/60">Per‑Panel Tick</div>
+                    {kindsInUse.map((kind) => (
+                      <label key={kind} className="flex items-center justify-between gap-2 text-xs">
+                        <span>{titleFor(kind)}</span>
+                        <TickSelect
+                          allowInherit
+                          inheritLabel="Layout"
+                          value={panelTickMs[kind]}
+                          onChange={(v) => setPanelTickMs((m) => {
+                            const next = { ...m }
+                            if (v == null) delete (next as any)[kind]
+                            else (next as any)[kind] = Math.max(0, v)
+                            return next
+                          })}
+                        />
+                      </label>
+                    ))}
+                    <div className="flex justify-end">
+                      <button className="rounded bg-white/10 px-2 py-1 text-xs hover:bg-white/15" onClick={() => setPanelTickMs({})}>Reset per‑panel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="mt-3 flex items-center gap-2">
                 <input className="w-full rounded-lg border border-white/20 bg-base-800/80 px-2 py-1 text-xs text-white placeholder-white/50 outline-none focus:border-white/40 focus:ring-1 focus:ring-white/20" placeholder="Save as…" value={savingName} onChange={(e) => setSavingName(e.target.value)} />
                 <button className="rounded-lg bg-white/10 px-2 py-1 text-xs hover:bg-white/15" onClick={() => { saveCurrentAs(savingName); setSavingName('') }}>Save</button>
@@ -538,5 +616,6 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
 
       {/* Dragging feedback: live preview swaps via transform-based tiles */}
     </div>
+    </TickConfigProvider>
   )
 }
