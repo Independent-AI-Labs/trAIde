@@ -92,7 +92,8 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
   // Fast drag preview using an imperative ghost overlay (no per-frame React updates)
   const dragRef = useRef<null | { id: string; dx: number; dy: number; w: number; h: number; fromX: number; fromY: number }>(null)
   const ghostRef = useRef<HTMLDivElement | null>(null)
-  const [resize, setResize] = useState<null | { id: string; startX: number; startY: number; w: number; h: number }>(null)
+  const dockRef = useRef<HTMLDivElement | null>(null)
+  const [resize, setResize] = useState<null | { id: string; startX: number; startY: number; w: number; h: number; x: number; y: number; mode: 'n'|'s'|'e'|'w'|'se' }>(null)
   const [preview, setPreview] = useState<Tile[] | null>(null)
   const previewRaf = useRef<number | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
@@ -269,6 +270,21 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
       const left0 = tile.x * (colW + gap)
       const top0 = tile.y * (rowH + gap)
       g.style.transform = `translate(${left0}px, ${top0}px)`
+
+      // Dock highlight overlay (under ghost): dashed border to show docking zone
+      const d = document.createElement('div')
+      d.setAttribute('data-dock', id)
+      d.style.position = 'absolute'
+      d.style.pointerEvents = 'none'
+      d.style.zIndex = '55'
+      d.style.borderRadius = '0.75rem'
+      d.style.border = '2px dashed rgba(99,102,241,0.6)'
+      d.style.background = 'rgba(99,102,241,0.08)'
+      d.style.width = g.style.width
+      d.style.height = g.style.height
+      d.style.transform = g.style.transform
+      el.appendChild(d)
+      dockRef.current = d
     } catch {}
     const onMove = (ev: MouseEvent) => {
       const r = canvasRef.current?.getBoundingClientRect(); if (!r) return
@@ -288,11 +304,16 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
       gx = Math.max(0, Math.min(Math.max(0, cols - tileNow.w), gx))
       gy = Math.max(0, gy)
 
-      // Move ghost to snapped slot
+      // Move ghost and docking overlay to snapped slot
       if (ghostRef.current) {
         const left = gx * cellW
         const top = gy * cellH
         ghostRef.current.style.transform = `translate(${left}px, ${top}px)`
+      }
+      if (dockRef.current) {
+        const left = gx * cellW
+        const top = gy * cellH
+        dockRef.current.style.transform = `translate(${left}px, ${top}px)`
       }
 
       // rAF-throttled arrangement
@@ -314,11 +335,16 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
       if (previewRaf.current != null) { cancelAnimationFrame(previewRaf.current); previewRaf.current = null }
       if (preview) setTiles(preview)
       setPreview(null)
-      // remove ghost
+      // remove overlays
       if (ghostRef.current) {
         const g = ghostRef.current
         ghostRef.current = null
         try { g.remove() } catch {}
+      }
+      if (dockRef.current) {
+        const d = dockRef.current
+        dockRef.current = null
+        try { d.remove() } catch {}
       }
     }
     window.addEventListener('mousemove', onMove)
@@ -329,40 +355,46 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
     if (!resize) return
     const onMove = (e: MouseEvent) => {
       e.preventDefault()
-      const el = canvasRef.current
-      if (!el) return
+      const el = canvasRef.current; if (!el) return
       const rect = el.getBoundingClientRect()
       const px = e.clientX - rect.left
       const py = e.clientY - rect.top
       const { colW, rowH, gap } = metrics
-      const tile = tiles.find(t => t.id === resize.id)
-      if (!tile) return
-      let gw = Math.max(1, Math.min(cols - tile.x, Math.round((px - tile.x * (colW + gap)) / (colW + gap))))
-      let gh = Math.max(1, Math.round((py - tile.y * (rowH + gap)) / (rowH + gap)))
-      const copy = tiles.map(t => t.id === tile.id ? { ...t, w: gw, h: gh } : t)
-      const noOverlap = ensureNoOverlap(copy, tile.id)
+      const tile0 = tiles.find(t => t.id === resize.id); if (!tile0) return
+      const cellW = colW + gap
+      const cellH = rowH + gap
+      const rightX = tile0.x + tile0.w
+      const bottomY = tile0.y + tile0.h
+      let nx = tile0.x, ny = tile0.y, nw = tile0.w, nh = tile0.h
+      if (resize.mode === 'e' || resize.mode === 'se') {
+        const gx = Math.round(px / cellW)
+        nw = Math.max(1, Math.min(cols - tile0.x, gx - tile0.x))
+      }
+      if (resize.mode === 's' || resize.mode === 'se') {
+        const gy = Math.round(py / cellH)
+        nh = Math.max(1, gy - tile0.y)
+      }
+      if (resize.mode === 'w') {
+        const gx = Math.round(px / cellW)
+        nx = Math.max(0, Math.min(tile0.x + tile0.w - 1, gx))
+        nw = Math.max(1, rightX - nx)
+      }
+      if (resize.mode === 'n') {
+        const gy = Math.round(py / cellH)
+        ny = Math.max(0, Math.min(tile0.y + tile0.h - 1, gy))
+        nh = Math.max(1, bottomY - ny)
+      }
+      const copy = tiles.map(t => t.id === tile0.id ? { ...t, x: nx, y: ny, w: nw, h: nh } : t)
+      const noOverlap = ensureNoOverlap(copy, tile0.id)
       const compacted = compactVertical(noOverlap, cols)
       setPreview(compacted)
-      setResize(r => (r ? { ...r, w: gw, h: gh } : r))
+      setResize(r => (r ? { ...r, w: nw, h: nh, x: nx, y: ny } : r))
     }
     const onUp = (e: MouseEvent) => {
       if (resize) {
         const el = canvasRef.current
         if (el) {
-          const rect = el.getBoundingClientRect()
-          const px = e.clientX - rect.left
-          const py = e.clientY - rect.top
-          const { colW, rowH, gap } = metrics
-          const tile = tiles.find(t => t.id === resize.id)
-          if (tile) {
-            let gw = Math.max(1, Math.min(cols - tile.x, Math.round((px - tile.x * (colW + gap)) / (colW + gap))))
-            let gh = Math.max(1, Math.round((py - tile.y * (rowH + gap)) / (rowH + gap)))
-            while (occupied(tile.id, tile.x, tile.y, gw, gh)) gh++
-            const copy = tiles.map(t => t.id === tile.id ? { ...t, w: gw, h: gh } : t)
-            const noOverlap = ensureNoOverlap(copy, tile.id)
-            const compacted = compactVertical(noOverlap, cols)
-            setTiles(compacted)
-          }
+          if (preview) setTiles(preview)
         }
       }
       setResize(null)
@@ -422,14 +454,26 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
               <TilePanel title={titleFor(t.kind)} onClose={() => closeTile(t.id)} onDragStart={(e) => startDrag(t.id, e)}>
                 {renderTileContent(t.kind, t.id)}
               </TilePanel>
-              {/* Resize handle (SE) */}
+              {/* Resize handles: N, S, E, W, SE */}
               <div
-                className="absolute bottom-1 right-1 hidden h-3 w-3 cursor-nwse-resize rounded-sm bg-white/50 group-hover:block"
-                onMouseDown={(e) => {
-                  e.stopPropagation(); e.preventDefault()
-                  setResize({ id: t.id, startX: e.clientX, startY: e.clientY, w: t.w, h: t.h })
-                  setSelectedId(t.id)
-                }}
+                className="absolute -top-1 left-1/2 hidden h-2 w-6 -translate-x-1/2 cursor-n-resize rounded-sm bg-white/40 group-hover:block"
+                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setResize({ id: t.id, startX: e.clientX, startY: e.clientY, w: t.w, h: t.h, x: t.x, y: t.y, mode: 'n' }); setSelectedId(t.id) }}
+              />
+              <div
+                className="absolute -bottom-1 left-1/2 hidden h-2 w-6 -translate-x-1/2 cursor-s-resize rounded-sm bg-white/40 group-hover:block"
+                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setResize({ id: t.id, startX: e.clientX, startY: e.clientY, w: t.w, h: t.h, x: t.x, y: t.y, mode: 's' }); setSelectedId(t.id) }}
+              />
+              <div
+                className="absolute right-0 top-1/2 hidden h-6 w-2 -translate-y-1/2 cursor-e-resize rounded-sm bg-white/40 group-hover:block"
+                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setResize({ id: t.id, startX: e.clientX, startY: e.clientY, w: t.w, h: t.h, x: t.x, y: t.y, mode: 'e' }); setSelectedId(t.id) }}
+              />
+              <div
+                className="absolute left-0 top-1/2 hidden h-6 w-2 -translate-y-1/2 cursor-w-resize rounded-sm bg-white/40 group-hover:block"
+                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setResize({ id: t.id, startX: e.clientX, startY: e.clientY, w: t.w, h: t.h, x: t.x, y: t.y, mode: 'w' }); setSelectedId(t.id) }}
+              />
+              <div
+                className="absolute -bottom-1 -right-1 hidden h-3 w-3 cursor-nwse-resize rounded-sm bg-white/50 group-hover:block"
+                onMouseDown={(e) => { e.stopPropagation(); e.preventDefault(); setResize({ id: t.id, startX: e.clientX, startY: e.clientY, w: t.w, h: t.h, x: t.x, y: t.y, mode: 'se' }); setSelectedId(t.id) }}
               />
             </div>
           )
