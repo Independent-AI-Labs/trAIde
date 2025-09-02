@@ -11,6 +11,7 @@ import { ComparePanel } from '@/components/landing/ComparePanel'
 import { HeatmapPanel } from '@/components/landing/HeatmapPanel'
 import dynamic from 'next/dynamic'
 import { RichTextPanel } from '@/components/panels/RichTextPanel'
+import { compactVertical, ensureNoOverlap, moveElement } from './engine'
 
 // lightweight chart wrapper used in landing; avoid SSR
 const OverlayChart = dynamic(() => import('@/components/charts/OverlayChart').then(m => m.OverlayChart), { ssr: false })
@@ -88,11 +89,12 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [cols, setCols] = useState<number>(1)
   const canvasRef = useRef<HTMLDivElement | null>(null)
-  const [drag, setDrag] = useState<null | { id: string; dx: number; dy: number; w: number; h: number; px: number; py: number }>(null)
-  const pointerRef = useRef<{ px: number; py: number } | null>(null)
-  const rafRef = useRef<number | null>(null)
+  // Fast drag preview using an imperative ghost overlay (no per-frame React updates)
+  const dragRef = useRef<null | { id: string; dx: number; dy: number; w: number; h: number; fromX: number; fromY: number }>(null)
+  const ghostRef = useRef<HTMLDivElement | null>(null)
   const [resize, setResize] = useState<null | { id: string; startX: number; startY: number; w: number; h: number }>(null)
-  const [snapFx, setSnapFx] = useState<null | { x: number; y: number; vertical: boolean }>(null)
+  const [preview, setPreview] = useState<Tile[] | null>(null)
+  const previewRaf = useRef<number | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const [layouts, setLayouts] = useState<Record<string, Tile[]>>({})
@@ -191,10 +193,60 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
     return { colW, rowH, gap }
   }, [cols, canvasRef.current?.clientWidth])
 
-  // basic collision check for target slot
+  // basic collision check for target slot (kept for local drag targeting)
   const occupied = useCallback((id: string, x: number, y: number, w: number, h: number) => {
     return tiles.some(t => t.id !== id && !(x + w <= t.x || t.x + t.w <= x || y + h <= t.y || t.y + t.h <= y))
   }, [tiles])
+
+  // Auto-arrangement: compact vertically for multisize tiles (React-Grid-Layout style)
+  function autoArrange(afterMove: Tile[], movedId?: string): Tile[] {
+    const items = afterMove.map(t => ({ ...t }))
+    const moved = movedId ? items.find(t => t.id === movedId) : undefined
+    const byTopLeft = (a: Tile, b: Tile) => (a.y - b.y) || (a.x - b.x)
+    const occ: boolean[][] = []
+    const mark = (x: number, y: number, w: number, h: number, val: boolean) => {
+      for (let yy = y; yy < y + h; yy++) {
+        if (!occ[yy]) occ[yy] = Array(cols).fill(false)
+        for (let xx = x; xx < x + w; xx++) occ[yy][xx] = val
+      }
+    }
+    const fits = (x: number, y: number, w: number, h: number) => {
+      if (x < 0 || x + w > cols || y < 0) return false
+      for (let yy = y; yy < y + h; yy++) {
+        const row = occ[yy]
+        for (let xx = x; xx < x + w; xx++) {
+          if (row && row[xx]) return false
+        }
+      }
+      return true
+    }
+    const placeAt = (t: Tile, x: number, y: number) => { t.x = x; t.y = y; mark(x, y, t.w, t.h, true) }
+
+    const out: Tile[] = []
+    if (moved) {
+      moved.x = Math.max(0, Math.min(Math.max(0, cols - moved.w), moved.x))
+      moved.y = Math.max(0, moved.y)
+      let gy = moved.y
+      while (!fits(moved.x, gy, moved.w, moved.h)) gy++
+      placeAt(moved, moved.x, gy); out.push(moved)
+    }
+    const rest = items.filter(t => !moved || t.id !== moved.id).sort(byTopLeft)
+    for (const t of rest) {
+      let placed = false
+      for (let gy = 0; !placed; gy++) {
+        // prefer original column first
+        const startX = Math.max(0, Math.min(cols - t.w, t.x))
+        for (let gx = startX; gx <= cols - t.w; gx++) {
+          if (fits(gx, gy, t.w, t.h)) { placeAt(t, gx, gy); out.push(t); placed = true; break }
+        }
+        if (placed) break
+        for (let gx = 0; gx < startX; gx++) {
+          if (fits(gx, gy, t.w, t.h)) { placeAt(t, gx, gy); out.push(t); placed = true; break }
+        }
+      }
+    }
+    return out
+  }
 
   // keyboard movement for selected tile (arrow keys)
   const onKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -215,7 +267,7 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
     while (occupied(next.id, next.x, ty, next.w, next.h)) ty++
     next.y = ty
     const copy = tiles.slice(); copy[idx] = next
-    setTiles(copy)
+    setTiles(autoArrange(copy, next.id))
   }, [selectedId, tiles, cols, occupied])
 
   // Drag handlers
@@ -227,69 +279,86 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
     if (!tile) return
     const px = e.clientX - rect.left
     const py = e.clientY - rect.top
-    const { colW, rowH } = metrics
-    const dx = px - tile.x * (colW + metrics.gap)
-    const dy = py - tile.y * (rowH + metrics.gap)
+    const { colW, rowH, gap } = metrics
+    const dx = px - tile.x * (colW + gap)
+    const dy = py - tile.y * (rowH + gap)
     setSelectedId(id)
-    setDrag({ id, dx, dy, w: tile.w, h: tile.h, px, py })
-    pointerRef.current = { px, py }
-    if (rafRef.current == null) {
-      const tick = () => {
-        if (pointerRef.current) {
-          setDrag(d => (d ? { ...d, px: pointerRef.current!.px, py: pointerRef.current!.py } : d))
-        }
-        rafRef.current = requestAnimationFrame(tick)
+    // remember origin to allow more intuitive swapping and ghost placement
+    dragRef.current = { id, dx, dy, w: tile.w, h: tile.h, fromX: tile.x, fromY: tile.y }
+
+    // Create a visible ghost overlay following the cursor (snapped to grid)
+    try {
+      const g = document.createElement('div')
+      g.setAttribute('data-ghost', id)
+      g.style.position = 'absolute'
+      g.style.pointerEvents = 'none'
+      g.style.zIndex = '60'
+      g.style.borderRadius = '0.75rem'
+      g.style.boxShadow = '0 0 0 2px rgba(99,102,241,0.8)'
+      g.style.background = 'rgba(255,255,255,0.06)'
+      g.style.backdropFilter = 'blur(2px)'
+      g.style.width = `${tile.w * (colW + gap) - gap}px`
+      g.style.height = `${tile.h * (rowH + gap) - gap}px`
+      el.appendChild(g)
+      ghostRef.current = g
+    } catch {}
+    const onMove = (ev: MouseEvent) => {
+      const r = canvasRef.current?.getBoundingClientRect(); if (!r) return
+      const d = dragRef.current; if (!d) return
+      const px2 = ev.clientX - r.left
+      const py2 = ev.clientY - r.top
+      const tileNow = tiles.find(t => t.id === d.id); if (!tileNow) return
+      // Center-based snapping for more predictable targets
+      const cellW = colW + gap
+      const cellH = rowH + gap
+      const leftPx = px2 - d.dx
+      const topPx = py2 - d.dy
+      const centerGX = (leftPx + (tileNow.w * cellW - gap) / 2) / cellW
+      const centerGY = (topPx + (tileNow.h * cellH - gap) / 2) / cellH
+      let gx = Math.round(centerGX - tileNow.w / 2)
+      let gy = Math.round(centerGY - tileNow.h / 2)
+      gx = Math.max(0, Math.min(Math.max(0, cols - tileNow.w), gx))
+      gy = Math.max(0, gy)
+
+      // Move ghost to snapped slot
+      if (ghostRef.current) {
+        const left = gx * cellW
+        const top = gy * cellH
+        ghostRef.current.style.transform = `translate(${left}px, ${top}px)`
       }
-      rafRef.current = requestAnimationFrame(tick)
+
+      // Stable live preview: arrange with the dragged tile pinned first
+      const placed = tiles.map(t => t.id === tileNow.id ? { ...t, x: gx, y: gy } : t)
+      const arranged = autoArrange(placed, tileNow.id)
+      if (previewRaf.current != null) cancelAnimationFrame(previewRaf.current)
+      previewRaf.current = requestAnimationFrame(() => setPreview(arranged))
     }
-  }, [tiles, metrics])
+    const onUp = () => {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      dragRef.current = null
+      if (previewRaf.current != null) { cancelAnimationFrame(previewRaf.current); previewRaf.current = null }
+      if (preview) setTiles(preview)
+      setPreview(null)
+      // remove ghost
+      if (ghostRef.current) {
+        const g = ghostRef.current
+        ghostRef.current = null
+        try { g.remove() } catch {}
+      }
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [tiles, metrics, cols, occupied, preview])
 
   useEffect(() => {
-    if (!drag && !resize) return
+    if (!resize) return
     const onMove = (e: MouseEvent) => {
       e.preventDefault()
-      const el = canvasRef.current
-      if (!el) return
-      const rect = el.getBoundingClientRect()
-      pointerRef.current = { px: e.clientX - rect.left, py: e.clientY - rect.top }
+      // No heavy work here; ghost dragging is imperative, only resize needs a tick
       setResize(r => (r ? { ...r } : r))
     }
     const onUp = (e: MouseEvent) => {
-      if (drag) {
-        const el = canvasRef.current
-        if (el) {
-          const rect = el.getBoundingClientRect()
-          const px = pointerRef.current?.px ?? drag.px ?? e.clientX - rect.left
-          const py = pointerRef.current?.py ?? drag.py ?? e.clientY - rect.top
-          const { colW, rowH, gap } = metrics
-          const tile = tiles.find(t => t.id === drag.id)
-          if (tile) {
-            let gx = Math.max(0, Math.min(Math.max(0, cols - tile.w), Math.round((px - drag.dx) / (colW + gap))))
-            let gy = Math.max(0, Math.round((py - drag.dy) / (rowH + gap)))
-            while (occupied(tile.id, gx, gy, tile.w, tile.h)) gy++
-            const copy = tiles.map(t => t.id === tile.id ? { ...t, x: gx, y: gy } : t)
-            setTiles(copy)
-            // physics snap: brief bounce
-            requestAnimationFrame(() => {
-              const elTile = document.querySelector(`[data-tile-id="${tile.id}"]`) as HTMLElement | null
-              if (elTile) {
-                elTile.classList.remove('snap-bounce')
-                void elTile.offsetWidth
-                elTile.classList.add('snap-bounce')
-                setTimeout(() => elTile.classList.remove('snap-bounce'), 260)
-              }
-            })
-            // draw snap line if adjacent to any neighbor
-            const neighbor = tiles.find(t => t.id !== tile.id && (t.x === gx + tile.w && t.y <= gy + tile.h - 1 && gy <= t.y + t.h - 1))
-              || tiles.find(t => t.id !== tile.id && (t.y === gy + tile.h && t.x <= gx + tile.w - 1 && gx <= t.x + t.w - 1))
-            if (neighbor) {
-              const vertical = Boolean(neighbor.x === gx + tile.w)
-              setSnapFx({ x: vertical ? neighbor.x : gx, y: vertical ? Math.max(gy, neighbor.y) : neighbor.y, vertical })
-              setTimeout(() => setSnapFx(null), 220)
-            }
-          }
-        }
-      }
       if (resize) {
         const el = canvasRef.current
         if (el) {
@@ -303,13 +372,13 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
             let gh = Math.max(1, Math.round((py - tile.y * (rowH + gap)) / (rowH + gap)))
             while (occupied(tile.id, tile.x, tile.y, gw, gh)) gh++
             const copy = tiles.map(t => t.id === tile.id ? { ...t, w: gw, h: gh } : t)
-            setTiles(copy)
+            const noOverlap = ensureNoOverlap(copy, tile.id)
+            const compacted = compactVertical(noOverlap, cols)
+            setTiles(compacted)
           }
         }
       }
-      setDrag(null); setResize(null)
-      pointerRef.current = null
-      if (rafRef.current != null) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+      setResize(null)
     }
     window.addEventListener('mousemove', onMove)
     window.addEventListener('mouseup', onUp, { once: true })
@@ -317,7 +386,18 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
       window.removeEventListener('mousemove', onMove)
       window.removeEventListener('mouseup', onUp as any)
     }
-  }, [drag, resize, tiles, cols, metrics, occupied])
+  }, [resize, tiles, cols, metrics, occupied])
+
+  const renderTiles = preview ?? tiles
+  const containerPxHeight = useMemo(() => {
+    const { rowH, gap } = metrics
+    let maxBottom = 0
+    for (const t of renderTiles) {
+      const bottom = t.y * (rowH + gap) + t.h * (rowH + gap) - gap
+      if (bottom > maxBottom) maxBottom = bottom
+    }
+    return Math.max(maxBottom, 1)
+  }, [renderTiles, metrics])
 
   return (
     <div
@@ -327,36 +407,46 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
       onKeyDown={onKeyDown}
       ref={canvasRef}
     >
-      <div className="grid h-full grid-cols-1 gap-4 md:grid-cols-2" style={{ gridAutoRows: '380px' }}>
-        {tiles.map(t => (
-          <div
-            key={t.id}
-            data-tile-id={t.id}
-            className={"group relative min-h-[380px] outline-2 outline-offset-2 transition-transform " + (selectedId === t.id ? 'outline-blue-400/70' : 'outline-transparent')}
-            style={{
-              gridColumn: `${Math.min(t.x + 1, cols)} / span ${Math.min(t.w, cols)}`,
-              gridRow: `${t.y + 1} / span ${Math.max(1, t.h)}`,
-              transform: drag && drag.id === t.id ? `translate(${(drag.px - drag.dx) - t.x * (metrics.colW + metrics.gap)}px, ${(drag.py - drag.dy) - t.y * (metrics.rowH + metrics.gap)}px)` : undefined,
-              zIndex: drag && drag.id === t.id ? 30 : undefined,
-              willChange: drag && drag.id === t.id ? 'transform' as any : undefined,
-            }}
-            onMouseDown={(e) => { e.stopPropagation(); setSelectedId(t.id) }}
-          >
-            <TilePanel title={titleFor(t.kind)} onClose={() => closeTile(t.id)} onDragStart={(e) => startDrag(t.id, e)}>
-              {renderTileContent(t.kind, t.id)}
-            </TilePanel>
-            {/* Resize handle (SE) */}
+      <div className="relative" style={{ height: containerPxHeight }}>
+        {renderTiles.map(t => {
+          const { colW, rowH, gap } = metrics
+          const left = t.x * (colW + gap)
+          const top = t.y * (rowH + gap)
+          const width = t.w * (colW + gap) - gap
+          const height = t.h * (rowH + gap) - gap
+          const isDragging = dragRef.current?.id === t.id
+          return (
             <div
-              className="absolute bottom-1 right-1 hidden h-3 w-3 cursor-nwse-resize rounded-sm bg-white/50 group-hover:block"
-              onMouseDown={(e) => {
-                e.stopPropagation(); e.preventDefault()
-                setResize({ id: t.id, startX: e.clientX, startY: e.clientY, w: t.w, h: t.h })
-                setSelectedId(t.id)
+              key={t.id}
+              data-tile-id={t.id}
+              className={"group absolute outline-2 outline-offset-2 " + (selectedId === t.id ? 'outline-blue-400/70' : 'outline-transparent')}
+              style={{
+                width,
+                height,
+                transform: `translate(${left}px, ${top}px)`,
+                transition: isDragging ? 'none' : 'transform 140ms ease-out',
+                zIndex: isDragging ? 40 : undefined,
+                opacity: isDragging ? 0.5 : 1,
+                willChange: 'transform',
               }}
-            />
-          </div>
-        ))}
-        {tiles.length === 0 && (
+              onMouseDown={(e) => { e.stopPropagation(); setSelectedId(t.id) }}
+            >
+              <TilePanel title={titleFor(t.kind)} onClose={() => closeTile(t.id)} onDragStart={(e) => startDrag(t.id, e)}>
+                {renderTileContent(t.kind, t.id)}
+              </TilePanel>
+              {/* Resize handle (SE) */}
+              <div
+                className="absolute bottom-1 right-1 hidden h-3 w-3 cursor-nwse-resize rounded-sm bg-white/50 group-hover:block"
+                onMouseDown={(e) => {
+                  e.stopPropagation(); e.preventDefault()
+                  setResize({ id: t.id, startX: e.clientX, startY: e.clientY, w: t.w, h: t.h })
+                  setSelectedId(t.id)
+                }}
+              />
+            </div>
+          )
+        })}
+        {renderTiles.length === 0 && (
           <div className="flex h-full items-center justify-center text-white/60">
             Right‑click to add panels…
           </div>
@@ -408,31 +498,7 @@ export function TileCanvas({ storageKey = 'traide.tiles.v1', seed }: { storageKe
         </div>
       </div>
 
-      {/* Drop preview rectangle while dragging */}
-      {drag && (() => {
-        const tile = tiles.find(tt => tt.id === drag.id)
-        if (!tile) return null
-        const { colW, rowH, gap } = metrics
-        let gx = Math.max(0, Math.min(Math.max(0, cols - tile.w), Math.round((drag.px - drag.dx) / (colW + gap))))
-        let gy = Math.max(0, Math.round((drag.py - drag.dy) / (rowH + gap)))
-        while (occupied(tile.id, gx, gy, tile.w, tile.h)) gy++
-        const left = gx * (colW + gap)
-        const top = gy * (rowH + gap)
-        const width = tile.w * (colW + gap) - gap
-        const height = tile.h * (rowH + gap) - gap
-        return (
-          <div className="pointer-events-none absolute z-20 rounded-xl border-2 border-sky-300/70 bg-sky-300/10" style={{ left, top, width, height }} />
-        )
-      })()}
-
-      {snapFx && (() => {
-        const { colW, rowH, gap } = metrics
-        const left = snapFx.vertical ? (snapFx.x) * (colW + gap) - gap / 2 : 0
-        const top = snapFx.vertical ? snapFx.y * (rowH + gap) : (snapFx.y) * (rowH + gap) - gap / 2
-        const w = snapFx.vertical ? 2 : (cols * (colW + gap))
-        const h = snapFx.vertical ? (rowH) : 2
-        return <div className="pointer-events-none absolute z-20 rounded-full bg-sky-300/50 blur-[1px]" style={{ left, top, width: w, height: h }} />
-      })()}
+      {/* Dragging feedback: live preview swaps via transform-based tiles */}
     </div>
   )
 }

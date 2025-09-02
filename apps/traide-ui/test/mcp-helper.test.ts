@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 
-import { sseUrl } from '@/lib/mcp'
+import { sseUrl, getMcpBaseUrlClient } from '@/lib/mcp'
 
 const OLD_ENV = process.env
 
@@ -15,20 +15,28 @@ describe('mcp helpers', () => {
     Object.defineProperty(document, 'cookie', { writable: true, value: '' })
   })
 
-  it('uses NEXT_PUBLIC_MCP_BASE_URL when set', () => {
+  it('sseUrl always proxies through /api/mcp', () => {
     process.env.NEXT_PUBLIC_MCP_BASE_URL = 'http://example:1234'
-    expect(sseUrl('/stream/klines?x=1')).toBe('http://example:1234/stream/klines?x=1')
-  })
-
-  it('falls back to mcp cookie when env not set', () => {
+    expect(sseUrl('/stream/klines?x=1')).toBe('/api/mcp/stream/klines?x=1')
     delete process.env.NEXT_PUBLIC_MCP_BASE_URL
     document.cookie = 'mcp=' + encodeURIComponent('http://foo:62007')
-    expect(sseUrl('/stream/klines')).toBe('http://foo:62007/stream/klines')
+    expect(sseUrl('/stream/klines')).toBe('/api/mcp/stream/klines')
+    document.cookie = ''
+    expect(sseUrl('/stream/klines')).toBe('/api/mcp/stream/klines')
   })
 
-  it('falls back to localhost when no base configured', () => {
+  it('getMcpBaseUrlClient reads env, then cookie', () => {
+    process.env.NEXT_PUBLIC_MCP_BASE_URL = 'http://example:1234'
+    expect(getMcpBaseUrlClient()).toBe('http://example:1234')
+    delete process.env.NEXT_PUBLIC_MCP_BASE_URL
+    document.cookie = 'mcp=' + encodeURIComponent('http://foo:62007')
+    expect(getMcpBaseUrlClient()).toBe('http://foo:62007')
+  })
+
+  it('getMcpBaseUrlClient falls back to host:62007 when none configured', () => {
     delete process.env.NEXT_PUBLIC_MCP_BASE_URL
     document.cookie = ''
-    expect(sseUrl('/stream/klines')).toBe('http://localhost:62007/stream/klines')
+    const base = getMcpBaseUrlClient()
+    expect(base && base.endsWith(':62007')).toBe(true)
   })
 })
