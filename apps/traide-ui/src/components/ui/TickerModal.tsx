@@ -49,6 +49,27 @@ export function TickerModal() {
   const visible = useMemo(() => groupList.slice(0, visibleCount), [groupList, visibleCount])
   const { lastBySymbol } = useBatchKlines(visible, '1m', { throttleMs: tickMs, enabled: ticker.open })
 
+  // Derive display prices and direction per visible symbol
+  const [display, setDisplay] = useState<Map<string, { price: number; dir: 1 | 0 | -1 }>>(new Map())
+  const prevPriceRef = useRef<Map<string, number>>(new Map())
+
+  useEffect(() => {
+    // Recalculate only for currently visible symbols to keep it light
+    const next = new Map<string, { price: number; dir: 1 | 0 | -1 }>()
+    for (const s of visible) {
+      const key = s.toUpperCase()
+      const last = lastBySymbol.get(key)
+      if (!last) continue
+      const price = Number(last.c)
+      if (!Number.isFinite(price)) continue
+      const prior = prevPriceRef.current.get(key)
+      const dir: 1 | 0 | -1 = prior == null ? 0 : price > prior ? 1 : price < prior ? -1 : 0
+      prevPriceRef.current.set(key, price)
+      next.set(key, { price, dir })
+    }
+    if (next.size) setDisplay(next)
+  }, [lastBySymbol, visible])
+
   // Auto-load next page when sentinel becomes visible
   useEffect(() => {
     const root = listRef.current
@@ -91,8 +112,8 @@ export function TickerModal() {
       />
       <div ref={listRef} className="grid max-h-96 grid-cols-2 gap-2 overflow-auto pr-1 sm:grid-cols-3">
         {visible.map((s, i) => {
-          const last = lastBySymbol.get(s.toUpperCase())
-          return <TickerItem key={`${s}-${i}`} symbol={s} onPick={onPick} price={last?.c ?? null} dir={0} />
+          const info = display.get(s.toUpperCase())
+          return <TickerItem key={`${s}-${i}`} symbol={s} onPick={onPick} price={info?.price ?? null} dir={info?.dir ?? 0} />
         })}
         {/* Sentinel for infinite scroll */}
         <div ref={sentinelRef} style={{ height: 1, gridColumn: '1 / -1' }} />
@@ -102,7 +123,7 @@ export function TickerModal() {
             onClick={() => setVisibleCount((n) => Math.min(groupList.length, n + PAGE))}
             className="col-span-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
           >
-            Load more ({Math.min(PAGE, groupList.length - visibleCount)} of {groupList.length - visibleCount} remaining)
+            {(() => { const remaining = Math.max(0, groupList.length - visibleCount); const next = Math.min(PAGE, remaining); return `Load more (${next} of ${remaining} remaining)` })()}
           </button>
         )}
       </div>
