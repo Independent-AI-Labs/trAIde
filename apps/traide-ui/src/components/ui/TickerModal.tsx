@@ -22,7 +22,7 @@ function TickerItem({ symbol, onPick, price, dir }: { symbol: string; onPick: (s
 export function TickerModal() {
   const { ticker, closeTicker, openChart } = useModals()
   const [q, setQ] = useState('')
-  const [activeGroup, setActiveGroup] = useState(GROUPS[0]!.id)
+  const [activeGroup, setActiveGroup] = useState<'all' | string>('all')
   const { symbols } = useSymbols()
   const listAll = useMemo(() => (symbols.length ? symbols : GROUPS.flatMap((g) => g.symbols)), [symbols.join(',')])
   const groupList = useMemo(() => {

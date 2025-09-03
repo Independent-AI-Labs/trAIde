@@ -83,6 +83,29 @@ const server = http.createServer((req, res) => {
     sse(res, corsVal)
     return void streamKlines(req, res)
   }
+  if (req.method === 'GET' && url.pathname === '/symbols') {
+    ;(async () => {
+      try {
+        const r = await fetch(`${BINANCE_REST}/exchangeInfo`, { cache: 'no-store' })
+        if (!r.ok) throw new Error('upstream_error')
+        const j = await r.json()
+        const syms = Array.isArray(j?.symbols)
+          ? j.symbols
+              .filter((s) => s && (s.status === 'TRADING' || s.status === 'TRADING'))
+              .map((s) => s.symbol)
+              .filter((s) => typeof s === 'string')
+          : []
+        const uniq = Array.from(new Set(syms)).filter(Boolean)
+        uniq.sort()
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ symbols: uniq, updatedAt: Date.now() }))
+      } catch (e) {
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ symbols: ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT', 'ADAUSDT'] }))
+      }
+    })()
+    return
+  }
   if (req.method === 'GET' && url.pathname === '/klines') {
     const symbol = (url.searchParams.get('symbol') || 'BTCUSDT').toUpperCase()
     const interval = url.searchParams.get('interval') || '1m'
