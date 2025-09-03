@@ -1,10 +1,11 @@
 "use client"
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { GROUPS } from '@/lib/symbols'
 import { useModals } from '@/lib/ui/modals'
 import { useSymbols } from '@/lib/data/useSymbols'
 import { useBatchKlines } from '@/lib/stream/useBatchKlines'
+import { useFetchers } from '@/lib/data/fetchers'
 import { useTickMs } from '@/lib/tickConfig'
 
 function TickerItem({ symbol, onPick, price, dir }: { symbol: string; onPick: (s: string) => void; price: number | null | undefined; dir: 1 | 0 | -1 }) {
@@ -18,6 +19,58 @@ function TickerItem({ symbol, onPick, price, dir }: { symbol: string; onPick: (s
       <div className="text-xs text-white/50">USDT Pair</div>
     </button>
   )
+}
+
+// Internal helper to stream a chunk and report updates upward
+function ChunkStream({
+  keyId,
+  symbols,
+  interval,
+  enabled,
+  throttleMs,
+  onUpdate,
+}: {
+  keyId: string
+  symbols: string[]
+  interval: string
+  enabled: boolean
+  throttleMs: number
+  onUpdate: (keyId: string, map: Map<string, { t: number; c: number }>) => void
+}) {
+  const { fetchKlinesBatchCached, fetchKlinesCached } = useFetchers()
+  // Seed current prices via HTTP batch to avoid blanks until next candle closes
+  useEffect(() => {
+    if (!enabled || !symbols.length) return
+    const ac = new AbortController()
+    const run = async () => {
+      try {
+        const m = new Map<string, { t: number; c: number }>()
+        const batch = await fetchKlinesBatchCached(symbols, interval, 1)
+        for (const sym of symbols) {
+          const arr = batch[sym.toUpperCase()] || []
+          const last = arr.length ? arr[arr.length - 1]! : undefined
+          if (last) m.set(sym.toUpperCase(), { t: last.t, c: last.c })
+        }
+        // Fallback to singles if batch produced nothing (e.g., upstream blocked)
+        if (m.size === 0) {
+          for (const sym of symbols) {
+            try {
+              const arr = await fetchKlinesCached(sym, interval, 1)
+              const last = arr.length ? arr[arr.length - 1]! : undefined
+              if (last) m.set(sym.toUpperCase(), { t: last.t, c: last.c })
+            } catch {}
+          }
+        }
+        if (m.size) onUpdate(keyId, m)
+      } catch {}
+    }
+    run()
+    return () => ac.abort()
+  }, [enabled, symbols.join(','), interval, keyId, onUpdate])
+
+  const { lastBySymbol } = useBatchKlines(symbols, interval, { throttleMs, enabled })
+  useEffect(() => { onUpdate(keyId, lastBySymbol) }, [keyId, lastBySymbol, onUpdate])
+  return null
 }
 
 export function TickerModal() {
@@ -37,7 +90,9 @@ export function TickerModal() {
   }, [q, activeGroup, listAll])
 
   // Lazy-load visible items in pages to limit concurrent SSE streams
-  const PAGE = 20
+  // Batch cap mirrors server-side MCP_MAX_BATCH to avoid 400s
+  const BATCH_CAP = Math.max(1, Number(process.env.NEXT_PUBLIC_MCP_MAX_BATCH || 20))
+  const PAGE = Math.max(1, Number(process.env.NEXT_PUBLIC_TICKER_PAGE_SIZE || BATCH_CAP))
   const [visibleCount, setVisibleCount] = useState(PAGE)
   const listRef = useRef<HTMLDivElement | null>(null)
   const sentinelRef = useRef<HTMLDivElement | null>(null)
@@ -47,18 +102,46 @@ export function TickerModal() {
   useEffect(() => { setVisibleCount(PAGE) }, [groupList])
 
   const visible = useMemo(() => groupList.slice(0, visibleCount), [groupList, visibleCount])
-  const { lastBySymbol } = useBatchKlines(visible, '1m', { throttleMs: tickMs, enabled: ticker.open })
+  // Stream batching to respect server-side MCP_MAX_BATCH cap
+  const chunks = useMemo(() => {
+    const out: { key: string; syms: string[] }[] = []
+    for (let i = 0; i < visible.length; i += BATCH_CAP) {
+      const syms = visible.slice(i, i + BATCH_CAP)
+      const key = syms.map((s) => s.toUpperCase()).join(',')
+      out.push({ key, syms })
+    }
+    return out
+  }, [visible, BATCH_CAP])
 
-  // Derive display prices and direction per visible symbol
+  // Collect per-chunk maps, then merge for display
+  const [chunkMaps, setChunkMaps] = useState<Record<string, Map<string, { t: number; c: number }>>>({})
+  const onChunkUpdate = useCallback((id: string, map: Map<string, { t: number; c: number }>) => {
+    setChunkMaps((prev) => {
+      // Ignore empty updates so we don't wipe seeded values before SSE emits
+      if (!map || map.size === 0) return prev
+      if (prev[id] === map) return prev
+      const next = { ...prev, [id]: map }
+      // prune stale keys when chunk composition changes
+      const valid = new Set(chunks.map((c) => c.key))
+      Object.keys(next).forEach((k) => { if (!valid.has(k)) delete (next as any)[k] })
+      return next
+    })
+  }, [chunks])
+
+  const merged = useMemo(() => {
+    const out = new Map<string, { t: number; c: number }>()
+    for (const m of Object.values(chunkMaps)) for (const [k, v] of m) out.set(k.toUpperCase(), v)
+    return out
+  }, [chunkMaps])
+
+  // Derive display prices and direction per visible symbol from merged map
   const [display, setDisplay] = useState<Map<string, { price: number; dir: 1 | 0 | -1 }>>(new Map())
   const prevPriceRef = useRef<Map<string, number>>(new Map())
-
   useEffect(() => {
-    // Recalculate only for currently visible symbols to keep it light
     const next = new Map<string, { price: number; dir: 1 | 0 | -1 }>()
     for (const s of visible) {
       const key = s.toUpperCase()
-      const last = lastBySymbol.get(key)
+      const last = merged.get(key)
       if (!last) continue
       const price = Number(last.c)
       if (!Number.isFinite(price)) continue
@@ -67,8 +150,8 @@ export function TickerModal() {
       prevPriceRef.current.set(key, price)
       next.set(key, { price, dir })
     }
-    if (next.size) setDisplay(next)
-  }, [lastBySymbol, visible])
+    setDisplay(next)
+  }, [merged, visible])
 
   // Auto-load next page when sentinel becomes visible
   useEffect(() => {
@@ -111,6 +194,10 @@ export function TickerModal() {
         }}
       />
       <div ref={listRef} className="grid max-h-96 grid-cols-2 gap-2 overflow-auto pr-1 sm:grid-cols-3">
+        {/* Hidden chunk streams to cover all visible pairs under server batch cap */}
+        {chunks.map((ch) => (
+          <ChunkStream key={`chunk-${ch.key}`} keyId={ch.key} symbols={ch.syms} interval="1m" enabled={ticker.open} throttleMs={tickMs} onUpdate={onChunkUpdate} />
+        ))}
         {visible.map((s, i) => {
           const info = display.get(s.toUpperCase())
           return <TickerItem key={`${s}-${i}`} symbol={s} onPick={onPick} price={info?.price ?? null} dir={info?.dir ?? 0} />

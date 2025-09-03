@@ -31,6 +31,7 @@ export function useSSE<T = unknown>(url?: string, opts: boolean | Options = true
       const now = Date.now()
       const since = now - (lastOpenAtRef.current || 0)
       const wait = Math.max(0, Math.max(delayMs, minOpenIntervalMs - since))
+      if (debug) console.debug('[SSE] schedule open', { url, delayMs, wait })
       timerRef.current = window.setTimeout(() => doOpen(), wait) as unknown as number
     }
     const doOpen = () => {
@@ -45,7 +46,7 @@ export function useSSE<T = unknown>(url?: string, opts: boolean | Options = true
       esRef.current = es
       setConnected(false)
       setError(null)
-      es.onopen = () => { setConnected(true); retryRef.current = 0 }
+      es.onopen = () => { if (debug) console.debug('[SSE] open', { url: u }); setConnected(true); retryRef.current = 0 }
       es.onerror = () => {
         setConnected(false)
         setError('stream_error')
@@ -54,6 +55,7 @@ export function useSSE<T = unknown>(url?: string, opts: boolean | Options = true
         const base = Math.min(backoffMaxMs, Math.floor(backoffBaseMs * Math.pow(2, retryRef.current++)))
         const jitter = 0.5 + Math.random() // 0.5x .. 1.5x
         const attempt = Math.floor(base * jitter)
+        if (debug) console.debug('[SSE] error; retry', { url: u, attempt, retry: retryRef.current })
         scheduleOpen(attempt)
       }
       const lastEmitRef = { t: 0 }
@@ -64,6 +66,7 @@ export function useSSE<T = unknown>(url?: string, opts: boolean | Options = true
           if (!throttleMs || now - lastEmitRef.t >= throttleMs) {
             lastEmitRef.t = now
             setLast(payload as T)
+            if (debug) console.debug('[SSE] message', { url: u, sample: typeof payload === 'object' ? { ...(payload as any), data: undefined } : typeof payload })
           }
         } catch {}
       }
@@ -73,8 +76,8 @@ export function useSSE<T = unknown>(url?: string, opts: boolean | Options = true
       const vis = document.visibilityState === 'visible'
       visibleRef.current = vis
       if (pauseWhenHidden) {
-        if (!vis && esRef.current) { esRef.current.close(); esRef.current = null; setConnected(false) }
-        if (vis && !esRef.current) scheduleOpen(0)
+        if (!vis && esRef.current) { if (debug) console.debug('[SSE] pause hidden', { url }); esRef.current.close(); esRef.current = null; setConnected(false) }
+        if (vis && !esRef.current) { if (debug) console.debug('[SSE] resume visible', { url }); scheduleOpen(0) }
       }
     }
     if (pauseWhenHidden && typeof document !== 'undefined') document.addEventListener('visibilitychange', onVis)
@@ -86,6 +89,7 @@ export function useSSE<T = unknown>(url?: string, opts: boolean | Options = true
       if (pauseWhenHidden && typeof document !== 'undefined') document.removeEventListener('visibilitychange', onVis)
     }
   }, [url, enabled, backoffBaseMs, backoffMaxMs, pauseWhenHidden, minOpenIntervalMs])
+  const debug = String(process.env.NEXT_PUBLIC_DEBUG_SSE) === 'true'
 
   return { last, connected, error }
 }

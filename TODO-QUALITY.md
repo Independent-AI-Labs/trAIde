@@ -25,9 +25,9 @@ Scope: apps/traide-ui, packages/traide-mcp, packages/traide-runner, and proxy ro
 - Coverage: root report covers only `src/**`. MCP/UI tests exist but not included in coverage reporting.
 ---
 
-## Milestone 2 — Streaming + Metrics (TODO)
+## Milestone 2 — Streaming + Metrics (WIP)
 
-- SSE hardening (UI): add jittered backoff and churn guard in `apps/traide-ui/src/lib/useSSE.ts`. Reject reopens within N ms and coalesce rapid URL flips.
+- SSE hardening (UI): add jittered backoff and churn guard in `apps/traide-ui/src/lib/useSSE.ts`. Reject reopens within N ms and coalesce rapid URL flips. Added optional client debug logs (`NEXT_PUBLIC_DEBUG_SSE=true`).
   - Tests: `apps/traide-ui/test/useSSE.churn.test.tsx` simulates rapid toggles; assert a single connect per window and no reconnection storm.
   - Acceptance: under 10 rapid URL flips in 1s, only 1 connection attempt occurs; reconnects jittered; no console error flood.
 
@@ -51,6 +51,24 @@ Scope: apps/traide-ui, packages/traide-mcp, packages/traide-runner, and proxy ro
 
 - Docs: update `TODO-QUALITY.md` and `README.md` with new envs and metrics names (`MCP_STREAM_BUDGET`, `MCP_TRUNCATE_BATCH`, counters/gauges).
   - Acceptance: envs and metrics documented with defaults and ranges.
+
+---
+
+Progress update (WIP)
+
+- Ticker/Pair dialog streaming fixed to respect batch caps and show values for all visible pairs:
+  - Implemented chunked SSE per page of visible symbols (cap = `NEXT_PUBLIC_MCP_MAX_BATCH` default 20), merging per‑chunk maps.
+  - Seeded prices via REST batch (`/klines/batch?limit=1`) with single‑symbol fallback, so new items display values immediately.
+  - Guarded against empty SSE updates wiping seeded values during handoff.
+  - Page size aligned to cap (overridable by `NEXT_PUBLIC_TICKER_PAGE_SIZE`).
+  - Search and Load more update chunk composition; merged map preserves values for visible items.
+
+- `useSSE` now logs open/retry/message when `NEXT_PUBLIC_DEBUG_SSE=true` to aid local diagnosis.
+
+- Remaining for this area:
+  - Add UI tests for Ticker modal chunk/merge and “Load more” label correctness.
+  - Optional: dynamically detect server cap instead of env.
+  - Consider dev synthetic data path in mini MCP for offline environments.
 
 ---
 
