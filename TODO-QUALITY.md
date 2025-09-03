@@ -236,6 +236,31 @@ Additional details from code review to make work items executable and testable.
 - Scope: GET `/klines*` only (history endpoints).
 - Key: full target URL after proxy normalization.
 - TTL: 10s (existing). Evict expired entries on read before counting toward capacity.
+
+---
+
+7) UI Component Hygiene — Unused Sweep (WIP)
+
+Method: heuristic grep for JSX tag usage and import references from outside each component file; then manual spot checks for pages/tiles.
+
+Candidates (appear unused app‑wide):
+- components/hero/HeroGlass.tsx — not imported anywhere.
+- components/hero/HeroChartLive.tsx — only used by HeroGlass; thus unused.
+- components/landing/PlaygroundPanel.tsx — not referenced in tiles or pages.
+- components/ui/SkeletonWave.tsx — no references.
+- components/ui/HoloSpinner.tsx — no references.
+- components/workspace/ChartWorkspace.tsx — not used by pages/tiles.
+  - Note: transitively implies components/ui/SymbolInput.tsx is likely unused (only referenced by ChartWorkspace).
+
+Used by tiles/pages (keep):
+- components/canvas/** (TileCanvas, ContextMenu, ComponentPalette, TilePanel) — used by landing/dashboard pages.
+- components/landing/{WatchlistPanel, StreamStatusPanel, ScannerPanel, ComparePanel, HeatmapPanel} — wired via TileCanvas.
+- components/ui/{FloatingHeader, LayoutsButton, LayoutsMenu, EndpointControl, DataTable, Field, GroupSelect, IntervalSelect, IndicatorPicker, TickSelect, Toast, ChartModal, TickerModal, GlobalModalsHost, StatusPill, SymbolInput?} — most are referenced; SymbolInput only in ChartWorkspace (see above).
+
+Proposed actions:
+- Confirm product intent for the hero/workspace views; if not planned, archive or delete the above candidates.
+- If keeping, add references or stories to exercise them and prevent bit‑rot.
+- Optional: add `eslint-plugin-import/no-unused-modules` to flag unused exports in CI (advisory only).
 - Capacity: default 200 keys; env `MCP_PROXY_CACHE_KEYS` (50‑2000). On write beyond capacity, evict least‑recently‑used.
 - Headers: keep `x-cache: HIT|MISS`. In dev with `NODE_ENV!=='production'`, optionally add `x-cache-size: <n>` and `x-cache-capacity: <n>` for diagnostics.
 - Metrics: add `proxy_cache_hits_total{route='klines'}`, `proxy_cache_misses_total{route='klines'}`, `proxy_cache_evictions_total{route='klines'}`.
