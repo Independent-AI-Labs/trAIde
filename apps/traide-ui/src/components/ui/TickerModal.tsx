@@ -4,19 +4,9 @@ import { Modal } from '@/components/ui/Modal'
 import { GROUPS } from '@/lib/symbols'
 import { useModals } from '@/lib/ui/modals'
 import { useSymbols } from '@/lib/data/useSymbols'
-import { useSSE } from '@/lib/useSSE'
-import { sseUrl } from '@/lib/mcp'
+import { useBatchQuotes } from '@/lib/data/useQuotes'
 
-function TickerItem({ symbol, onPick, enabled }: { symbol: string; onPick: (s: string) => void; enabled: boolean }) {
-  const { last } = useSSE<any>(sseUrl(`/stream/klines?symbol=${symbol}&interval=1m`), { enabled, throttleMs: 500 })
-  const [price, setPrice] = useState<number | null>(null)
-  const [dir, setDir] = useState<1 | -1 | 0>(0)
-  useEffect(() => {
-    const k = (last as any)?.candle
-    if (!k) return
-    setDir((prev) => (price == null ? 0 : (k.c > price ? 1 : (k.c < price ? -1 : 0))))
-    setPrice(k.c)
-  }, [last])
+function TickerItem({ symbol, onPick, price, dir }: { symbol: string; onPick: (s: string) => void; price: number | null | undefined; dir: 1 | 0 | -1 }) {
   const color = price == null ? 'text-white/60' : dir > 0 ? 'text-emerald-300' : dir < 0 ? 'text-rose-300' : 'text-white/70'
   return (
     <button className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-left text-sm hover:bg-white/10 focus:outline-none focus:ring-1 focus:ring-white/20" onClick={() => onPick(symbol)}>
@@ -36,11 +26,15 @@ export function TickerModal() {
   const { symbols } = useSymbols()
   const listAll = useMemo(() => (symbols.length ? symbols : GROUPS.flatMap((g) => g.symbols)), [symbols.join(',')])
   const groupList = useMemo(() => {
-    const g = GROUPS.find((g) => g.id === activeGroup) || GROUPS[0]!
+    const dynAll = { id: 'all', name: 'All', symbols: listAll } as { id: string; name: string; symbols: string[] }
+    const g = [dynAll, ...GROUPS].find((g) => g.id === activeGroup) || dynAll
     const base = g.symbols.length ? g.symbols : listAll
     const qq = q.trim().toUpperCase()
     return qq ? base.filter((s) => s.includes(qq)) : base
   }, [q, activeGroup, listAll])
+
+  const visible = useMemo(() => groupList.slice(0, 60), [groupList])
+  const quotes = useBatchQuotes(visible, { interval: '1m', refreshMs: 1500, limit: 1 })
 
   const onPick = (s: string) => {
     if (ticker.onSelect) ticker.onSelect(s)
@@ -51,7 +45,7 @@ export function TickerModal() {
   return (
     <Modal open={ticker.open} onClose={closeTicker} title={<div className="flex items-center justify-between"><span>Select Ticker / Pair</span><span className="text-xs text-white/50">{groupList.length} results</span></div>}>
       <div className="mb-3 flex items-center gap-2">
-        {GROUPS.map((g) => (
+        {[{ id: 'all', name: 'All' } as const, ...GROUPS].map((g) => (
           <button key={g.id} className={`rounded-lg px-2 py-1 text-xs ${g.id === activeGroup ? 'bg-white/20' : 'bg-white/10 hover:bg-white/15'}`} onClick={() => setActiveGroup(g.id)}>
             {g.name}
           </button>
@@ -67,9 +61,10 @@ export function TickerModal() {
         }}
       />
       <div className="grid max-h-96 grid-cols-2 gap-2 overflow-auto pr-1 sm:grid-cols-3">
-        {groupList.slice(0, 36).map((s) => (
-          <TickerItem key={s} symbol={s} onPick={onPick} enabled={ticker.open} />
-        ))}
+        {visible.map((s) => {
+          const qv = quotes.get(s)
+          return <TickerItem key={s} symbol={s} onPick={onPick} price={qv?.price ?? null} dir={qv?.dir ?? 0} />
+        })}
       </div>
     </Modal>
   )
