@@ -2,9 +2,35 @@ import { NextRequest } from 'next/server'
 
 export const runtime = 'nodejs'
 
-// naive in-memory cache for /klines GET to reduce upstream load
-const cache = new Map<string, { body: ArrayBuffer; ct: string; exp: number }>()
+// LRU+TTL cache for GET /klines* to reduce upstream load
+type CacheEntry = { body: ArrayBuffer; ct: string; exp: number }
+const cache = new Map<string, CacheEntry>()
 const TTL_MS = 10_000
+function cacheCapacity() {
+  const raw = Number(process.env.MCP_PROXY_CACHE_KEYS || 200)
+  if (!Number.isFinite(raw)) return 200
+  return Math.max(50, Math.min(2000, Math.floor(raw)))
+}
+function cacheGet(key: string): CacheEntry | undefined {
+  const hit = cache.get(key)
+  if (!hit) return undefined
+  const now = Date.now()
+  if (hit.exp <= now) { cache.delete(key); return undefined }
+  // Move to MRU by re-inserting
+  cache.delete(key)
+  cache.set(key, hit)
+  return hit
+}
+function cacheSet(key: string, val: CacheEntry) {
+  cache.set(key, val)
+  const cap = cacheCapacity()
+  // Evict LRU while above capacity
+  while (cache.size > cap) {
+    const oldest = cache.keys().next().value as string | undefined
+    if (oldest == null) break
+    cache.delete(oldest)
+  }
+}
 const MAX_BODY_BYTES = 5 * 1024 * 1024 // 5MB cap for non-SSE
 const ALLOW_PRIVATE = process.env.MCP_ALLOW_PRIVATE === 'true'
 const ALLOWED_HOSTS = (process.env.MCP_ALLOWED_HOSTS || '')
@@ -69,10 +95,14 @@ async function proxy(req: NextRequest, init?: RequestInit) {
   const url = buildTargetUrl(req)
   const isKlines = req.method === 'GET' && url.includes('/klines')
   if (isKlines) {
-    const hit = cache.get(url)
-    const now = Date.now()
-    if (hit && hit.exp > now) {
-      return new Response(hit.body, { status: 200, headers: { 'content-type': hit.ct, 'x-cache': 'HIT' } })
+    const hit = cacheGet(url)
+    if (hit) {
+      const headers: Record<string, string> = { 'content-type': hit.ct, 'x-cache': 'HIT' }
+      if (process.env.NODE_ENV !== 'production') {
+        headers['x-cache-size'] = String(cache.size)
+        headers['x-cache-capacity'] = String(cacheCapacity())
+      }
+      return new Response(hit.body, { status: 200, headers })
     }
   }
   const ac = new AbortController()
@@ -119,7 +149,7 @@ async function proxy(req: NextRequest, init?: RequestInit) {
   if (!ct.includes('text/event-stream') && ab.byteLength > MAX_BODY_BYTES) {
     return new Response(JSON.stringify({ error: 'response_too_large' }), { status: 502, headers: { 'content-type': 'application/json' } })
   }
-  if (isKlines && res.ok) cache.set(url, { body: ab, ct, exp: Date.now() + TTL_MS })
+  if (isKlines && res.ok) cacheSet(url, { body: ab, ct, exp: Date.now() + TTL_MS })
   return new Response(ab, { status: res.status, headers: { 'content-type': ct || 'application/json', 'x-proxy-target': url } })
 }
 

@@ -210,17 +210,27 @@ export function startHttpServer(provider: MarketDataProvider) {
         const interval = url.searchParams.get('interval') ?? '1m'
         const closedOnly = (url.searchParams.get('closedOnly') ?? 'true').toLowerCase() !== 'false'
         const symbols = symbolsParam.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)
+        const maxBatchRaw = Number(process.env.MCP_MAX_BATCH || 20)
+        const maxBatch = Math.max(1, Math.min(200, Number.isFinite(maxBatchRaw) ? Math.floor(maxBatchRaw) : 20))
+        const truncate = String(process.env.MCP_TRUNCATE_BATCH || 'false').toLowerCase() === 'true'
         if (!symbols.length) {
           res.writeHead(400, { 'content-type': 'application/json' })
           metrics.inc('http_requests_total', { route: 'stream_klines_batch', method: 'GET', status: '400' })
           return void res.end(JSON.stringify({ error: 'invalid_request', requestId: reqId }))
         }
+        if (symbols.length > maxBatch && !truncate) {
+          res.writeHead(400, { 'content-type': 'application/json' })
+          metrics.inc('http_requests_total', { route: 'stream_klines_batch', method: 'GET', status: '400' })
+          return void res.end(JSON.stringify({ error: 'too_many_symbols', max: maxBatch, requestId: reqId }))
+        }
+        const finalSymbols = symbols.length > maxBatch && truncate ? symbols.slice(0, maxBatch) : symbols
         res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
+        if (symbols.length > maxBatch && truncate) { try { res.write(': truncated\n\n') } catch {} }
         res.write('\n')
         const startedAt = Date.now()
         const keepalive = setInterval(() => { try { res.write(': keepalive\n\n') } catch {} }, 15000)
         const unsubs: Array<() => void> = []
-        for (const sym of symbols) {
+        for (const sym of finalSymbols) {
           const unsub = provider.streamKlines({ symbol: sym, interval, closedOnly }, (e) => {
             if (e.type === 'kline' && e.candle) {
               const payload = { ...e, symbol: sym }
@@ -263,4 +273,3 @@ export function startHttpServer(provider: MarketDataProvider) {
   server.listen(port, '0.0.0.0', () => logger.info(`HTTP listening on :${port}`))
   return server
 }
-
