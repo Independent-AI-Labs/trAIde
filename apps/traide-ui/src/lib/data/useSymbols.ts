@@ -20,7 +20,10 @@ export function useSymbols() {
       if (!r.ok) throw new Error('symbols_fetch_error')
       const j = await r.json()
       const arr = Array.isArray(j?.symbols) ? (j.symbols as string[]) : []
-      return arr
+      // de-duplicate and sort for stable UI
+      const uniq = Array.from(new Set(arr)).filter(Boolean)
+      uniq.sort()
+      return uniq
     }).then((arr) => {
       if (cancelled) return
       cache.set(key, arr, ttlMs)
@@ -30,4 +33,3 @@ export function useSymbols() {
   }, [])
   return { symbols, loading, error }
 }
-

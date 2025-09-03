@@ -30,7 +30,9 @@ export function TickerModal() {
     const g = [dynAll, ...GROUPS].find((g) => g.id === activeGroup) || dynAll
     const base = g.symbols.length ? g.symbols : listAll
     const qq = q.trim().toUpperCase()
-    return qq ? base.filter((s) => s.includes(qq)) : base
+    const filtered = qq ? base.filter((s) => s.includes(qq)) : base
+    // De-duplicate to avoid React key collisions
+    return Array.from(new Set(filtered))
   }, [q, activeGroup, listAll])
 
   const visible = useMemo(() => groupList.slice(0, 60), [groupList])
@@ -61,9 +63,9 @@ export function TickerModal() {
         }}
       />
       <div className="grid max-h-96 grid-cols-2 gap-2 overflow-auto pr-1 sm:grid-cols-3">
-        {visible.map((s) => {
+        {visible.map((s, i) => {
           const qv = quotes.get(s)
-          return <TickerItem key={s} symbol={s} onPick={onPick} price={qv?.price ?? null} dir={qv?.dir ?? 0} />
+          return <TickerItem key={`${s}-${i}`} symbol={s} onPick={onPick} price={qv?.price ?? null} dir={qv?.dir ?? 0} />
         })}
       </div>
     </Modal>
