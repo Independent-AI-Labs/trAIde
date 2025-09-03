@@ -21,6 +21,19 @@ function startMockServer(handler: (req: http.IncomingMessage, res: http.ServerRe
   })
 }
 
+function httpGetText(url: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const req = http.get(url, (res) => {
+      let data = ''
+      res.setEncoding('utf8')
+      res.on('data', (chunk) => (data += chunk))
+      res.on('end', () => resolve(data))
+    })
+    req.on('error', reject)
+    req.end()
+  })
+}
+
 describe.sequential('Next API proxy /api/mcp/*', () => {
   const OLD_ENV = process.env
   let upstream: { server: http.Server; url: string; port: number } | null = null
@@ -147,6 +160,7 @@ describe.sequential('Next API proxy /api/mcp/*', () => {
 describe.sequential('dev force localhost override', () => {
   const OLD_ENV = process.env
   let local62007: http.Server | null = null
+  let canBind = true
 
   beforeAll(async () => {
     process.env = { ...OLD_ENV }
@@ -160,18 +174,29 @@ describe.sequential('dev force localhost override', () => {
         res.end('unknown')
       }
     })
-    await new Promise((r) => local62007!.listen(62007, '127.0.0.1', () => r(null)))
+    await new Promise((r) => {
+      local62007!.once('error', (e: any) => {
+        if (e && e.code === 'EADDRINUSE') { canBind = false; r(null) }
+      })
+      try { local62007!.listen(62007, '127.0.0.1', () => r(null)) } catch { canBind = false; r(null) }
+    })
+    // If another process already binds 62007, or binding succeeded but not our server, detect and skip
+    try {
+      const body = await httpGetText('http://127.0.0.1:62007/health')
+      if (body !== 'ok-dev-local') canBind = false
+    } catch {}
     // Reset module cache so route reads fresh env defaults
     vi.resetModules()
     route = await import('@/app/api/mcp/[...path]/route')
   })
 
   afterAll(async () => {
-    await new Promise((r) => local62007!.close(() => r(null)))
+    if (canBind) await new Promise((r) => local62007!.close(() => r(null)))
     process.env = OLD_ENV
   })
 
   it('defaults to localhost:62007 in non-production even if cookie set', async () => {
+    if (!canBind) return
     delete process.env.MCP_FORCE_LOCAL // default true
     process.env.NODE_ENV = 'test'
     const cookie = 'mcp=' + encodeURIComponent('http://127.0.0.1:65535')

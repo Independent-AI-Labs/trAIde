@@ -1,10 +1,11 @@
 "use client"
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import { Modal } from '@/components/ui/Modal'
 import { GROUPS } from '@/lib/symbols'
 import { useModals } from '@/lib/ui/modals'
 import { useSymbols } from '@/lib/data/useSymbols'
 import { useBatchKlines } from '@/lib/stream/useBatchKlines'
+import { useTickMs } from '@/lib/tickConfig'
 
 function TickerItem({ symbol, onPick, price, dir }: { symbol: string; onPick: (s: string) => void; price: number | null | undefined; dir: 1 | 0 | -1 }) {
   const color = price == null ? 'text-white/60' : dir > 0 ? 'text-emerald-300' : dir < 0 ? 'text-rose-300' : 'text-white/70'
@@ -35,8 +36,34 @@ export function TickerModal() {
     return Array.from(new Set(filtered))
   }, [q, activeGroup, listAll])
 
-  const visible = useMemo(() => groupList.slice(0, 50), [groupList])
-  const { lastBySymbol } = useBatchKlines(visible, '1m', { throttleMs: 500 })
+  // Lazy-load visible items in pages to limit concurrent SSE streams
+  const PAGE = 20
+  const [visibleCount, setVisibleCount] = useState(PAGE)
+  const listRef = useRef<HTMLDivElement | null>(null)
+  const sentinelRef = useRef<HTMLDivElement | null>(null)
+  const tickMs = useTickMs()
+
+  // Reset pagination when the filtered list changes
+  useEffect(() => { setVisibleCount(PAGE) }, [groupList])
+
+  const visible = useMemo(() => groupList.slice(0, visibleCount), [groupList, visibleCount])
+  const { lastBySymbol } = useBatchKlines(visible, '1m', { throttleMs: tickMs, enabled: ticker.open })
+
+  // Auto-load next page when sentinel becomes visible
+  useEffect(() => {
+    const root = listRef.current
+    const sentinel = sentinelRef.current
+    if (!root || !sentinel) return
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) {
+        if (e.isIntersecting) {
+          setVisibleCount((n) => Math.min(groupList.length, n + PAGE))
+        }
+      }
+    }, { root, rootMargin: '0px', threshold: 1.0 })
+    io.observe(sentinel)
+    return () => { try { io.disconnect() } catch {} }
+  }, [groupList.length])
 
   const onPick = (s: string) => {
     if (ticker.onSelect) ticker.onSelect(s)
@@ -62,11 +89,22 @@ export function TickerModal() {
           if (e.key === 'Enter' && groupList.length) onPick(groupList[0]!)
         }}
       />
-      <div className="grid max-h-96 grid-cols-2 gap-2 overflow-auto pr-1 sm:grid-cols-3">
+      <div ref={listRef} className="grid max-h-96 grid-cols-2 gap-2 overflow-auto pr-1 sm:grid-cols-3">
         {visible.map((s, i) => {
           const last = lastBySymbol.get(s.toUpperCase())
           return <TickerItem key={`${s}-${i}`} symbol={s} onPick={onPick} price={last?.c ?? null} dir={0} />
         })}
+        {/* Sentinel for infinite scroll */}
+        <div ref={sentinelRef} style={{ height: 1, gridColumn: '1 / -1' }} />
+        {/* Manual fallback control */}
+        {visibleCount < groupList.length && (
+          <button
+            onClick={() => setVisibleCount((n) => Math.min(groupList.length, n + PAGE))}
+            className="col-span-full mt-1 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/80 hover:bg-white/10"
+          >
+            Load more ({Math.min(PAGE, groupList.length - visibleCount)} of {groupList.length - visibleCount} remaining)
+          </button>
+        )}
       </div>
     </Modal>
   )
