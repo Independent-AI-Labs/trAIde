@@ -23,6 +23,34 @@ Scope: apps/traide-ui, packages/traide-mcp, packages/traide-runner, and proxy ro
 - MCP: HTTP server with REST + SSE, rate limit, optional token auth, metrics. Binance provider has WS backoff + closed-candle replay. Mini server for dev with batch cap.
 - Runner: start/stop/status/logs with port cleanup; nodemon optional.
 - Coverage: root report covers only `src/**`. MCP/UI tests exist but not included in coverage reporting.
+---
+
+## Milestone 2 — Streaming + Metrics (TODO)
+
+- SSE hardening (UI): add jittered backoff and churn guard in `apps/traide-ui/src/lib/useSSE.ts`. Reject reopens within N ms and coalesce rapid URL flips.
+  - Tests: `apps/traide-ui/test/useSSE.churn.test.tsx` simulates rapid toggles; assert a single connect per window and no reconnection storm.
+  - Acceptance: under 10 rapid URL flips in 1s, only 1 connection attempt occurs; reconnects jittered; no console error flood.
+
+- MCP metrics: instrument `packages/traide-mcp/src/http.ts` for `upstream_failures_total`, `sse_backpressure_total`, and `active_streams` gauge; expose via `/metrics`.
+  - Tests: `packages/traide-mcp/test/integration/http.metrics.test.ts` validating counters/gauge and `http_stream_duration_seconds` histogram increments.
+  - Acceptance: metrics include new counters/gauge; values change predictably during tests.
+
+- Batch behavior decision: finalize cap handling for `/stream/klines/batch`.
+  - Default: keep `400 { error: 'too_many_symbols' }` when exceeding `MCP_MAX_BATCH`.
+  - Optional: `MCP_TRUNCATE_BATCH=true` truncates symbol list to cap and emits a `: truncated` SSE comment.
+  - Action: lock docs and tests accordingly.
+
+- Global stream budget (optional): implement `MCP_STREAM_BUDGET` with `429 { error: 'too_many_streams' }` on exceed and `sse_rejected_total` counter.
+  - Tests: open many streams to reach budget; assert 429 for new connections and counter increment.
+  - Acceptance: budget respected; `active_streams` gauge reflects current subscriptions.
+
+- Proxy observability: add lightweight counters for cache hits/misses/evictions in the Next.js proxy.
+  - Location: `apps/traide-ui/src/app/api/mcp/[...path]/route.ts`.
+  - Reporting: dev-only headers/logs or integrate with MCP `/metrics` if desired.
+  - Acceptance: visible, low-overhead diagnostics during development.
+
+- Docs: update `TODO-QUALITY.md` and `README.md` with new envs and metrics names (`MCP_STREAM_BUDGET`, `MCP_TRUNCATE_BATCH`, counters/gauges).
+  - Acceptance: envs and metrics documented with defaults and ranges.
 
 ---
 
