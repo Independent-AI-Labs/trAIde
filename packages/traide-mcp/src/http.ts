@@ -13,6 +13,7 @@ export function startHttpServer(provider: MarketDataProvider) {
   if (!cfg.enableHttp) return null
 
   const limiter = new RateLimiter(30, 15) // 30 burst, 15 rps refill
+  let activeStreams = 0
   const server = http.createServer(async (req: IncomingMessage, res: ServerResponse) => {
     try {
       const url = new URL(req.url ?? '/', `http://${req.headers.host}`)
@@ -60,7 +61,13 @@ export function startHttpServer(provider: MarketDataProvider) {
       // GET /symbols
       if (req.method === 'GET' && url.pathname === '/symbols') {
         metrics.inc('http_requests_total', { route: 'symbols', method: 'GET' })
-        const symbols = await withTiming('http_latency_seconds', () => provider.getSymbols())
+        let symbols: string[] = []
+        try {
+          symbols = await withTiming('http_latency_seconds', () => provider.getSymbols())
+        } catch (e) {
+          metrics.inc('upstream_failures_total', { route: 'symbols' })
+          throw e
+        }
         res.writeHead(200, { 'content-type': 'application/json' })
         return void res.end(JSON.stringify({ symbols, updatedAt: Date.now(), requestId: reqId }))
       }
@@ -80,13 +87,19 @@ export function startHttpServer(provider: MarketDataProvider) {
           metrics.inc('http_requests_total', { route: 'klines', method: 'GET', status: '400' })
           return void res.end(JSON.stringify({ error: mapError(e), requestId: reqId }))
         }
-        const candles = await withTiming('http_latency_seconds', () => provider.getKlines({
-          symbol,
-          interval,
-          start: start ? +start : undefined,
-          end: end ? +end : undefined,
-          limit: limit ? +limit : undefined,
-        }))
+        let candles
+        try {
+          candles = await withTiming('http_latency_seconds', () => provider.getKlines({
+            symbol,
+            interval,
+            start: start ? +start : undefined,
+            end: end ? +end : undefined,
+            limit: limit ? +limit : undefined,
+          }))
+        } catch (e) {
+          metrics.inc('upstream_failures_total', { route: 'klines' })
+          throw e
+        }
         res.writeHead(200, { 'content-type': 'application/json' })
         metrics.inc('http_requests_total', { route: 'klines', method: 'GET', status: '200' })
         return void res.end(JSON.stringify({ candles, requestId: reqId }))
@@ -138,13 +151,19 @@ export function startHttpServer(provider: MarketDataProvider) {
           metrics.inc('http_requests_total', { route: 'indicators', method: 'POST', status: '400' })
           return void res.end(JSON.stringify({ error: mapError(e), requestId: reqId }))
         }
-        const candles = await withTiming('http_latency_seconds', () => provider.getKlines({
-          symbol: body.symbol,
-          interval: body.interval,
-          start: body.start,
-          end: body.end,
-          limit: body.limit,
-        }))
+        let candles
+        try {
+          candles = await withTiming('http_latency_seconds', () => provider.getKlines({
+            symbol: body.symbol,
+            interval: body.interval,
+            start: body.start,
+            end: body.end,
+            limit: body.limit,
+          }))
+        } catch (e) {
+          metrics.inc('upstream_failures_total', { route: 'indicators' })
+          throw e
+        }
         const out = buildSeries(body, candles)
         res.writeHead(200, { 'content-type': 'application/json' })
         metrics.inc('http_requests_total', { route: 'indicators', method: 'POST', status: '200' })
@@ -161,6 +180,8 @@ export function startHttpServer(provider: MarketDataProvider) {
           'x-request-id': reqId,
         })
         metrics.inc('http_streams_open_total', { route: 'stream_klines' })
+        activeStreams += 1
+        metrics.setGauge('active_streams', activeStreams)
         const symbol = url.searchParams.get('symbol') ?? 'BTCUSDT'
         const interval = url.searchParams.get('interval') ?? '1m'
         const indParam = url.searchParams.get('indicators')
@@ -188,9 +209,11 @@ export function startHttpServer(provider: MarketDataProvider) {
             if (calc.atr) { const a = calc.atr.update(h, l, c); deltas.atr = Number.isFinite(a) ? a : null }
             if (calc.stoch) { const s = calc.stoch.update(h, l, c); deltas.stoch_k = Number.isFinite(s.k) ? s.k : null; deltas.stoch_d = Number.isFinite(s.d) ? s.d : null }
             if (calc.vwap) { const w = calc.vwap.update(h, l, c, v); deltas.vwap = Number.isFinite(w) ? w : null }
-            res.write(`data: ${JSON.stringify({ ...e, deltas, requestId: reqId })}\n\n`)
+            const ok = res.write(`data: ${JSON.stringify({ ...e, deltas, requestId: reqId })}\n\n`)
+            if (!ok) metrics.inc('sse_backpressure_total', { route: 'stream_klines' })
           } else {
-            res.write(`data: ${JSON.stringify({ ...e, requestId: reqId })}\n\n`)
+            const ok = res.write(`data: ${JSON.stringify({ ...e, requestId: reqId })}\n\n`)
+            if (!ok) metrics.inc('sse_backpressure_total', { route: 'stream_klines' })
           }
         })
         req.on('close', () => {
@@ -199,6 +222,8 @@ export function startHttpServer(provider: MarketDataProvider) {
           metrics.inc('http_streams_closed_total', { route: 'stream_klines' })
           const seconds = Math.max(0, (Date.now() - startedAt) / 1000)
           metrics.observe('http_stream_duration_seconds', seconds)
+          activeStreams = Math.max(0, activeStreams - 1)
+          metrics.setGauge('active_streams', activeStreams)
         })
         return
       }
@@ -227,6 +252,8 @@ export function startHttpServer(provider: MarketDataProvider) {
         res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' })
         if (symbols.length > maxBatch && truncate) { try { res.write(': truncated\n\n') } catch {} }
         res.write('\n')
+        activeStreams += 1
+        metrics.setGauge('active_streams', activeStreams)
         const startedAt = Date.now()
         const keepalive = setInterval(() => { try { res.write(': keepalive\n\n') } catch {} }, 15000)
         const unsubs: Array<() => void> = []
@@ -234,7 +261,8 @@ export function startHttpServer(provider: MarketDataProvider) {
           const unsub = provider.streamKlines({ symbol: sym, interval, closedOnly }, (e) => {
             if (e.type === 'kline' && e.candle) {
               const payload = { ...e, symbol: sym }
-              res.write(`data: ${JSON.stringify(payload)}\n\n`)
+              const ok = res.write(`data: ${JSON.stringify(payload)}\n\n`)
+              if (!ok) metrics.inc('sse_backpressure_total', { route: 'stream_klines_batch' })
             }
           })
           unsubs.push(unsub)
@@ -245,6 +273,8 @@ export function startHttpServer(provider: MarketDataProvider) {
           metrics.inc('http_streams_closed_total', { route: 'stream_klines_batch' })
           const seconds = Math.max(0, (Date.now() - startedAt) / 1000)
           metrics.observe('http_stream_duration_seconds', seconds)
+          activeStreams = Math.max(0, activeStreams - 1)
+          metrics.setGauge('active_streams', activeStreams)
         })
         return
       }

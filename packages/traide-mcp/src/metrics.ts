@@ -1,9 +1,11 @@
 type Counter = { name: string; help?: string; value: number; labels?: Record<string, string> };
 type Histogram = { name: string; help?: string; buckets: number[]; counts: number[]; sum: number; count: number };
+type Gauge = { name: string; help?: string; value: number; labels?: Record<string, string> };
 
 class Registry {
   private counters = new Map<string, Counter>();
   private histograms = new Map<string, Histogram>();
+  private gauges = new Map<string, Gauge>();
 
   inc(name: string, labels?: Record<string, string>, by = 1) {
     const key = this.key(name, labels);
@@ -22,12 +24,31 @@ class Registry {
     this.histograms.set(name, h);
   }
 
+  setGauge(name: string, value: number, labels?: Record<string, string>) {
+    const key = this.key(name, labels);
+    const g = this.gauges.get(key) ?? { name, value: 0, labels };
+    g.value = value;
+    this.gauges.set(key, g);
+  }
+
+  incGauge(name: string, by = 1, labels?: Record<string, string>) {
+    const key = this.key(name, labels);
+    const g = this.gauges.get(key) ?? { name, value: 0, labels };
+    g.value += by;
+    this.gauges.set(key, g);
+  }
+
   renderProm(): string {
     const lines: string[] = [];
     for (const c of this.counters.values()) {
       const labels = c.labels && Object.keys(c.labels).length ? `{${Object.entries(c.labels).map(([k, v]) => `${k}="${v}"`).join(',')}}` : '';
       lines.push(`# TYPE ${c.name} counter`);
       lines.push(`${c.name}${labels} ${c.value}`);
+    }
+    for (const g of this.gauges.values()) {
+      const labels = g.labels && Object.keys(g.labels).length ? `{${Object.entries(g.labels).map(([k, v]) => `${k}="${v}"`).join(',')}}` : '';
+      lines.push(`# TYPE ${g.name} gauge`);
+      lines.push(`${g.name}${labels} ${g.value}`);
     }
     for (const h of this.histograms.values()) {
       lines.push(`# TYPE ${h.name} histogram`);
@@ -58,4 +79,3 @@ export function withTiming<T>(metric: string, fn: () => Promise<T>) {
     metrics.observe(metric, seconds);
   });
 }
-
