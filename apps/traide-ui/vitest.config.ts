@@ -9,7 +9,7 @@ export default defineConfig({
   },
   coverage: {
     provider: 'v8',
-    reportsDirectory: 'coverage',
+    reportsDirectory: 'apps/traide-ui/coverage',
     reporter: ['text', 'html', 'lcov'],
     all: true,
     include: ['src/**/*.{ts,tsx}'],

@@ -24,3 +24,17 @@ jobs:
         env:
           BINANCE_REST_URL: https://api.binance.com
           BINANCE_WS_URL: wss://stream.binance.com/ws
+      - name: Upload root coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-root-${{ matrix.node }}
+          path: coverage
+      - name: Run UI tests with coverage
+        run: npm run ui:test
+      - name: Upload UI coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-ui-${{ matrix.node }}
+          path: apps/traide-ui/coverage
