@@ -9,6 +9,7 @@ import { useMcpBaseUrl } from '@/lib/mcp'
 import { usePref } from '@/lib/prefs'
 import { useIdlePrefetch } from '@/lib/data/prefetch'
 import { useTicker } from '@/lib/tickConfig'
+import { useModals } from '@/lib/ui/modals'
 
 const COLORS = ['#34d399', '#60a5fa', '#f472b6', '#fbbf24']
 
@@ -18,19 +19,26 @@ export function ComparePanel() {
   const [symbols, setSymbols] = useState<string[]>(['BTCUSDT', 'ETHUSDT', 'SOLUSDT'])
   const [interval, setInterval] = usePref<'1m' | '5m' | '15m' | '1h' | '4h' | '1d'>('compare.interval', '1m')
   const [data, setData] = useState<Record<string, { t: number; c: number }[]>>({})
-  const { fetchKlinesCached } = useFetchers()
+  const { fetchKlinesBatchCached } = useFetchers()
   useIdlePrefetch(symbols, interval, 240)
   const tick = useTicker()
+  const { openTicker } = useModals()
 
   useEffect(() => {
     let cancelled = false
-    async function load(sym: string) {
-      const cs = await fetchKlinesCached(sym, interval, 240)
-      const candles = cs.map((k) => ({ t: k.t, c: k.c }))
-      if (!cancelled) setData((d) => ({ ...d, [sym]: candles }))
+    async function loadAll() {
+      const batch = await fetchKlinesBatchCached(symbols, interval, 240)
+      if (cancelled) return
+      setData((d) => {
+        const next = { ...d }
+        for (const s of symbols) {
+          const cs = batch[s] || []
+          next[s] = cs.map((k) => ({ t: k.t, c: k.c }))
+        }
+        return next
+      })
     }
-    // Do not clear existing state to avoid visual resets; update per-symbol instead
-    symbols.forEach((s) => { load(s) })
+    loadAll()
     return () => { cancelled = true }
   }, [symbols.join(','), interval, tick])
 
@@ -52,7 +60,6 @@ export function ComparePanel() {
               <button
                 className="w-28 rounded-xl border border-white/15 bg-white/5 px-2 py-1 text-xs uppercase text-white/80 outline-none hover:bg-white/10"
                 onClick={() => {
-                  const { openTicker } = require('@/lib/ui/modals') as typeof import('@/lib/ui/modals')
                   openTicker((sym) => setSymbols((arr) => arr.map((v, idx) => (idx === i ? sym : v))))
                 }}
               >

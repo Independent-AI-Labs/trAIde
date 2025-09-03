@@ -83,6 +83,38 @@ const server = http.createServer((req, res) => {
     sse(res, corsVal)
     return void streamKlines(req, res)
   }
+  // Batch klines stream (multiplex symbols)
+  if (req.method === 'GET' && url.pathname === '/stream/klines/batch') {
+    const symbolsParam = url.searchParams.get('symbols') || ''
+    const interval = url.searchParams.get('interval') || '1m'
+    const symbols = symbolsParam.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)
+    // Cap number of upstream WS connections to avoid exhausting resources in dev
+    const cap = Math.max(1, Math.min(20, Number(process.env.MCP_DEV_MAX_BATCH || 20)))
+    const capped = symbols.slice(0, cap)
+    const corsVal = allowAll ? '*' : (origin && allowOrigin(origin) ? origin : undefined)
+    sse(res, corsVal)
+    if (!capped.length) { res.write(`data: ${JSON.stringify({ type: 'error', error: 'invalid_request' })}\n\n`); return }
+    const conns = []
+    for (const sym of capped) {
+      const topic = `${sym.toLowerCase()}@kline_${interval}`
+      const wsUrl = (process.env.BINANCE_WS_URL || 'wss://stream.binance.com/ws') + `/${topic}`
+      const ws = new WebSocket(wsUrl)
+      // Swallow connection errors to avoid crashing when closing before 'open'
+      ws.on('error', () => { /* no-op in dev mini server */ })
+      conns.push(ws)
+      ws.on('message', (buf) => {
+        try {
+          const msg = JSON.parse(buf.toString('utf8'))
+          const k = msg.k
+          if (!k) return
+          const evt = { type: 'kline', symbol: sym, interval: k.i || interval, candle: { t: k.t, o: Number(k.o), h: Number(k.h), l: Number(k.l), c: Number(k.c), v: Number(k.v) }, closed: Boolean(k.x) }
+          res.write(`data: ${JSON.stringify(evt)}\n\n`)
+        } catch {}
+      })
+    }
+    req.on('close', () => { for (const ws of conns) { try { ws.close() } catch {} } })
+    return
+  }
   if (req.method === 'GET' && url.pathname === '/symbols') {
     ;(async () => {
       try {
@@ -136,6 +168,46 @@ const server = http.createServer((req, res) => {
         console.log(JSON.stringify({ level: 'error', msg: 'klines_error', symbol, interval }))
         res.writeHead(502, { 'content-type': 'application/json' })
         res.end(JSON.stringify({ error: 'binance_fetch_failed' }))
+      }
+    })()
+    return
+  }
+  // Batch klines REST
+  if (req.method === 'GET' && url.pathname === '/klines/batch') {
+    ;(async () => {
+      try {
+        const symbolsParam = url.searchParams.get('symbols') || ''
+        const interval = url.searchParams.get('interval') || '1m'
+        const limit = Math.max(1, Math.min(1000, Number(url.searchParams.get('limit') || 200)))
+        const symbols = symbolsParam.split(',').map((s) => s.trim().toUpperCase()).filter(Boolean)
+        if (!symbols.length) { res.writeHead(400, { 'content-type': 'application/json' }); return void res.end(JSON.stringify({ error: 'invalid_request' })) }
+        const out = {}
+        const max = Math.max(1, Math.min(8, Number(process.env.MCP_BATCH_CONCURRENCY || 6)))
+        let idx = 0
+        async function runOne() {
+          const i = idx++
+          const sym = symbols[i]
+          if (!sym) return
+          const qs = new URLSearchParams({ symbol: sym, interval, limit: String(limit) }).toString()
+          const restUrl = `${BINANCE_REST}/klines?${qs}`
+          try {
+            const r = await fetch(restUrl, { cache: 'no-store' })
+            if (!r.ok) throw new Error('upstream_error')
+            const rows = await r.json()
+            out[sym] = Array.isArray(rows)
+              ? rows.map((row) => ({ t: row[0], o: Number(row[1]), h: Number(row[2]), l: Number(row[3]), c: Number(row[4]), v: Number(row[5]) }))
+              : []
+          } catch {
+            out[sym] = []
+          }
+          return runOne()
+        }
+        await Promise.all(Array.from({ length: Math.min(max, symbols.length) }, () => runOne()))
+        res.writeHead(200, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ interval, result: out }))
+      } catch (e) {
+        res.writeHead(502, { 'content-type': 'application/json' })
+        res.end(JSON.stringify({ error: 'batch_failed' }))
       }
     })()
     return

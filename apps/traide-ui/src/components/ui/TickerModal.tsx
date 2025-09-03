@@ -4,7 +4,7 @@ import { Modal } from '@/components/ui/Modal'
 import { GROUPS } from '@/lib/symbols'
 import { useModals } from '@/lib/ui/modals'
 import { useSymbols } from '@/lib/data/useSymbols'
-import { useBatchQuotes } from '@/lib/data/useQuotes'
+import { useBatchKlines } from '@/lib/stream/useBatchKlines'
 
 function TickerItem({ symbol, onPick, price, dir }: { symbol: string; onPick: (s: string) => void; price: number | null | undefined; dir: 1 | 0 | -1 }) {
   const color = price == null ? 'text-white/60' : dir > 0 ? 'text-emerald-300' : dir < 0 ? 'text-rose-300' : 'text-white/70'
@@ -35,8 +35,8 @@ export function TickerModal() {
     return Array.from(new Set(filtered))
   }, [q, activeGroup, listAll])
 
-  const visible = useMemo(() => groupList.slice(0, 60), [groupList])
-  const quotes = useBatchQuotes(visible, { interval: '1m', refreshMs: 1500, limit: 1 })
+  const visible = useMemo(() => groupList.slice(0, 50), [groupList])
+  const { lastBySymbol } = useBatchKlines(visible, '1m', { throttleMs: 500 })
 
   const onPick = (s: string) => {
     if (ticker.onSelect) ticker.onSelect(s)
@@ -64,8 +64,8 @@ export function TickerModal() {
       />
       <div className="grid max-h-96 grid-cols-2 gap-2 overflow-auto pr-1 sm:grid-cols-3">
         {visible.map((s, i) => {
-          const qv = quotes.get(s)
-          return <TickerItem key={`${s}-${i}`} symbol={s} onPick={onPick} price={qv?.price ?? null} dir={qv?.dir ?? 0} />
+          const last = lastBySymbol.get(s.toUpperCase())
+          return <TickerItem key={`${s}-${i}`} symbol={s} onPick={onPick} price={last?.c ?? null} dir={0} />
         })}
       </div>
     </Modal>

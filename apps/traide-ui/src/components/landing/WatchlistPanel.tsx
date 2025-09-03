@@ -1,59 +1,56 @@
 "use client"
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { MiniChart } from '@/components/charts/MiniChart'
-import { useSSE } from '@/lib/useSSE'
-import { sseUrl, useMcpBaseUrl } from '@/lib/mcp'
+import { useMcpBaseUrl } from '@/lib/mcp'
 import { useTickMs } from '@/lib/tickConfig'
 import { useModals } from '@/lib/ui/modals'
+import { useBatchKlines } from '@/lib/stream/useBatchKlines'
+import { useFetchers } from '@/lib/data/fetchers'
 
 type KEvent = { type: 'kline'; candle?: { t: number; c: number } }
 
 const DEFAULT = ['BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT']
 
 export function WatchlistPanel({ symbols = DEFAULT, interval = '1m' }: { symbols?: string[]; interval?: string }) {
+  const { lastBySymbol, connected } = useBatchKlines(symbols, interval)
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {symbols.map((s) => (
-        <WatchItem key={s} symbol={s} interval={interval} />
+        <WatchItem key={s} symbol={s} interval={interval} last={lastBySymbol.get(s.toUpperCase())} connected={connected} />
       ))}
     </div>
   )
 }
 
-function WatchItem({ symbol, interval }: { symbol: string; interval: string }) {
+function WatchItem({ symbol, interval, last, connected }: { symbol: string; interval: string; last?: { t: number; c: number }; connected?: boolean }) {
   useMcpBaseUrl()
-  const url = sseUrl(`/stream/klines?symbol=${symbol}&interval=${interval}`)
   const tickMs = useTickMs()
-  const { last, connected } = useSSE<KEvent>(url, { enabled: true, throttleMs: tickMs })
   const [series, setSeries] = useState<{ t: number; c: number }[]>([])
   const [base, setBase] = useState<number | null>(null)
   const lastTs = useRef(0)
   const { openChart } = useModals()
+  const { fetchKlinesCached } = useFetchers()
 
   useEffect(() => {
     let cancelled = false
     async function seed() {
-      try {
-        const r = await fetch(`/api/mcp/klines?symbol=${symbol}&interval=${interval}&limit=60`, { cache: 'no-cache' })
-        const j = await r.json()
-        const candles: { t: number; c: number }[] = (j?.candles || []).map((k: any) => ({ t: k.t, c: k.c }))
-        if (!cancelled) {
-          setSeries(candles)
-          lastTs.current = candles.length ? candles[candles.length - 1]!.t : 0
-          setBase(candles.length ? candles[0]!.c : null)
-        }
-      } catch {}
+      const cs = await fetchKlinesCached(symbol, interval, 60)
+      if (!cancelled) {
+        const candles = cs.map((k) => ({ t: k.t, c: k.c }))
+        setSeries(candles)
+        lastTs.current = candles.length ? candles[candles.length - 1]!.t : 0
+        setBase(candles.length ? candles[0]!.c : null)
+      }
     }
-    seed()
-    return () => { cancelled = true }
+    seed(); return () => { cancelled = true }
   }, [symbol, interval])
 
   useEffect(() => {
-    if (!last || last.type !== 'kline' || !last.candle) return
-    const { t, c } = last.candle
+    if (!last) return
+    const { t, c } = last
     if (t === lastTs.current) setSeries((s) => (s.length ? [...s.slice(0, -1), { t, c }] : [{ t, c }]))
     else if (t > lastTs.current) { setSeries((s) => [...s, { t, c }]); lastTs.current = t }
-  }, [last])
+  }, [last?.t, last?.c])
 
   const price = series.length ? series[series.length - 1]!.c : null
   const changePct = useMemo(() => {

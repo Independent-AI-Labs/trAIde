@@ -18,7 +18,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
     <html lang="en" className="dark">
       <body className="min-h-screen antialiased">
         <MCPConfigProvider>
-          <NetConfigProvider>
+          <NetConfigProvider concurrency={12} ttlMs={10_000}>
           <MarketCacheProvider>
             <ToastProvider>
               <UIOverlayProvider>

@@ -1,5 +1,4 @@
 import { NextRequest } from 'next/server'
-import { cookies } from 'next/headers'
 
 export const runtime = 'nodejs'
 
@@ -31,7 +30,12 @@ function isPrivateHost(host: string): boolean {
   return false
 }
 
-function targetBase() {
+function targetBase(req: NextRequest) {
+  // In dev, prefer local MCP to avoid LAN routing issues unless explicitly disabled
+  const forceLocal = process.env.MCP_FORCE_LOCAL !== 'false'
+  if (process.env.NODE_ENV !== 'production' && forceLocal) {
+    return 'http://localhost:62007'
+  }
   const envProd = process.env.MCP_BASE_URL || process.env.NEXT_PUBLIC_MCP_BASE_URL
   // In production, prefer pinned env and ignore cookie unless allowlisted
   if (process.env.NODE_ENV === 'production') {
@@ -39,7 +43,8 @@ function targetBase() {
     // fallback to default in the rare case env is unset
     return 'http://localhost:62007'
   }
-  const c = cookies().get('mcp')?.value
+  // Use request-bound cookies to avoid dynamic headers() access in dev
+  const c = req.cookies.get('mcp')?.value
   const raw = (c && decodeURIComponent(c)) || envProd || 'http://localhost:62007'
   try {
     const u = new URL(raw)
@@ -54,7 +59,7 @@ function targetBase() {
 }
 
 function buildTargetUrl(req: NextRequest) {
-  const base = targetBase().replace(/\/$/, '')
+  const base = targetBase(req).replace(/\/$/, '')
   const path = req.nextUrl.pathname.replace(/^\/api\/mcp/, '')
   const qs = req.nextUrl.search
   return base + path + qs
@@ -72,16 +77,26 @@ async function proxy(req: NextRequest, init?: RequestInit) {
   }
   const ac = new AbortController()
   const to = setTimeout(() => ac.abort(), 15_000)
-  const res = await fetch(url, {
-    // Pass through method and body for POST
-    method: init?.method || req.method,
-    body: init?.body || (req.method !== 'GET' && req.method !== 'HEAD' ? await req.text() : undefined),
-    headers: { 'content-type': req.headers.get('content-type') || undefined },
-    duplex: 'half',
-    redirect: 'manual',
-    cache: 'no-cache',
-    signal: ac.signal,
-  } as RequestInit).finally(() => clearTimeout(to))
+  let res: Response
+  try {
+    res = await fetch(url, {
+      // Pass through method and body for POST
+      method: init?.method || req.method,
+      body: init?.body || (req.method !== 'GET' && req.method !== 'HEAD' ? await req.text() : undefined),
+      headers: { 'content-type': req.headers.get('content-type') || undefined },
+      duplex: 'half',
+      redirect: 'manual',
+      cache: 'no-cache',
+      signal: ac.signal,
+    } as RequestInit)
+  } catch (e) {
+    clearTimeout(to)
+    // Upstream unreachable; return a small JSON error instead of throwing to avoid huge dev logs
+    const body = JSON.stringify({ error: 'upstream_unreachable' })
+    return new Response(body, { status: 502, headers: { 'content-type': 'application/json', 'x-proxy-target': url } })
+  } finally {
+    clearTimeout(to)
+  }
   // For SSE, stream through raw body and critical headers
   const ct = res.headers.get('content-type') || ''
   if (ct.includes('text/event-stream')) {

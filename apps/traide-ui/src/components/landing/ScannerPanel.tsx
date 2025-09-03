@@ -10,6 +10,7 @@ import { usePref } from '@/lib/prefs'
 import { DataTable, Column } from '@/components/ui/DataTable'
 import { useIdlePrefetch } from '@/lib/data/prefetch'
 import { useTicker } from '@/lib/tickConfig'
+import { useModals } from '@/lib/ui/modals'
 
 // candle type kept implicit via fetchers; avoid unused type warning
 
@@ -34,8 +35,9 @@ export function ScannerPanel() {
   const [rules, setRules] = useState<Array<{ key: keyof Row; op: '>=' | '<=' | '>' | '<'; value: number }>>([
     { key: 'changePct', op: '>=', value: -1000 },
   ])
-  const { fetchKlinesCached } = useFetchers()
+  const { fetchKlinesBatchCached } = useFetchers()
   const tick = useTicker()
+  const { openTicker, openChart } = useModals()
 
   const group = getGroup(groupId)
   useIdlePrefetch(group.symbols, interval, lookback)
@@ -44,22 +46,21 @@ export function ScannerPanel() {
     let cancelled = false
     async function loadAll() {
       setLoading((was) => (rows.length === 0 ? true : was))
-      const res = await Promise.allSettled(
-        group.symbols.map(async (sym) => {
-          const cs = await fetchKlinesCached(sym, interval, lookback)
-          if (!cs.length) return null
-          const first = cs[0]!.c
-          const last = cs[cs.length - 1]!.c
-          const changePct = ((last - first) / first) * 100
-          const hi = Math.max(...cs.map((x) => x.h))
-          const lo = Math.min(...cs.map((x) => x.l))
-          const rangePct = ((hi - lo) / first) * 100
-          const vol = cs.reduce((a, b) => a + b.v, 0)
-          const slope = linregSlope(cs.map((x) => x.c))
-          return { symbol: sym, price: last, changePct, rangePct, vol, slope } as Row
-        }),
-      )
-      const out = res.map((r) => (r.status === 'fulfilled' ? r.value : null)).filter(Boolean) as Row[]
+      const batch = await fetchKlinesBatchCached(group.symbols, interval, lookback)
+      const out: Row[] = []
+      for (const sym of group.symbols) {
+        const cs = batch[sym]
+        if (!cs || !cs.length) continue
+        const first = cs[0]!.c
+        const last = cs[cs.length - 1]!.c
+        const changePct = ((last - first) / first) * 100
+        const hi = Math.max(...cs.map((x) => x.h))
+        const lo = Math.min(...cs.map((x) => x.l))
+        const rangePct = ((hi - lo) / first) * 100
+        const vol = cs.reduce((a, b) => a + b.v, 0)
+        const slope = linregSlope(cs.map((x) => x.c))
+        out.push({ symbol: sym, price: last, changePct, rangePct, vol, slope })
+      }
       if (!cancelled) setRows(out)
       setLoading(false)
     }
@@ -91,7 +92,6 @@ export function ScannerPanel() {
       <button
         className="rounded-lg bg-white/5 px-2 py-1 hover:bg-white/10"
         onClick={() => {
-          const { openTicker, openChart } = require('@/lib/ui/modals') as typeof import('@/lib/ui/modals')
           // If user wants a different symbol, allow change; otherwise open current
           openTicker((sym) => openChart(sym))
         }}
